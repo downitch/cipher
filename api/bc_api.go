@@ -9,6 +9,7 @@ import(
 	"fmt"
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"math/big"
 
@@ -16,6 +17,7 @@ import(
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type Client ethclient.Client
@@ -140,55 +142,71 @@ func SendMessageByBlockchain(client ethclient.Client, key string, msg string, re
  	if err != nil {
  		return "can't sign transaction", err
  	}
+ 	ts := types.Transactions{signedTx}
+ 	rawTxBytes := ts.GetRlp(0)
+ 	rawTxHex := hex.EncodeToString(rawTxBytes)
  	// sending transaction into blockchain
- 	err = client.SendTransaction(context.Background(), signedTx)
- 	if err != nil {
- 		fmt.Println(err)
- 		return "can't send transaction", err
- 	}
+ 	// err = client.SendTransaction(context.Background(), signedTx)
+ 	// if err != nil {
+ 	// 	fmt.Println(err)
+ 	// 	return "can't send transaction", err
+ 	// }
  	// returning transaction receipt hex value to the user
  	// this value may be used to find transaction in the blockchain
- 	return signedTx.Hash().Hex(), nil
+ 	result := fmt.Sprintf("0x%s", rawTxHex)
+ 	return result, nil
 }
 
+func DecodeRawTx(rawTx string) (string, error) {
+	var tx *types.Transaction
+	raw, err := hex.DecodeString(rawTx)
+	if err != nil {
+		return "can't parse raw tx", err
+	}
+	rlp.DecodeBytes(raw, &tx)
+	result := string(tx.Data())
+	return result, nil
+}
+
+// DEPRECATED
 // This function connects to infura websocket and starts watching
 // blockchain blocks checking if there are any messages delivered
 // to current account (public key == address)
-func WatchBlockchain(client ethclient.Client, key string) error {
-	// setting a channel that will receive blocks and pass it into loop
-	headers := make(chan *types.Header)
-	// subscribing to receive new headers
-	sub, err := client.SubscribeNewHead(context.Background(), headers)
-	if err != nil {
-		fmt.Println("error subscribing")
-		return err
-	}
-	// starting a forever loop that will watch every block and check it
-	for {
-		select {
-			// in case if an error happens, returning an error
-			case err := <-sub.Err():
-				fmt.Println("error getting block")
-				return err
-			// checking header, parsing block information
-			case header := <-headers:
-				block, _ := client.BlockByHash(context.Background(), header.Hash())
-				// if block contains transactions loop them
-				if block != nil {
-					if len(block.Transactions()) != 0 {
-						go func() {
-							for _, tx := range block.Transactions() {
-								// if recepient and current public address are same
-								// passing message back in order to store it in db
-								if tx.To() != nil {
-									if tx.To().Hex() == key {
-										fmt.Println(tx)
-									}
-								}
-							}
-						}()
-					}
-				}
-		}
-	}
-}
+// func WatchBlockchain(client ethclient.Client, key string) error {
+// 	// setting a channel that will receive blocks and pass it into loop
+// 	headers := make(chan *types.Header)
+// 	// subscribing to receive new headers
+// 	sub, err := client.SubscribeNewHead(context.Background(), headers)
+// 	if err != nil {
+// 		fmt.Println("error subscribing")
+// 		return err
+// 	}
+// 	// starting a forever loop that will watch every block and check it
+// 	for {
+// 		select {
+// 			// in case if an error happens, returning an error
+// 			case err := <-sub.Err():
+// 				fmt.Println("error getting block")
+// 				return err
+// 			// checking header, parsing block information
+// 			case header := <-headers:
+// 				block, _ := client.BlockByHash(context.Background(), header.Hash())
+// 				// if block contains transactions loop them
+// 				if block != nil {
+// 					if len(block.Transactions()) != 0 {
+// 						go func() {
+// 							for _, tx := range block.Transactions() {
+// 								// if recepient and current public address are same
+// 								// passing message back in order to store it in db
+// 								if tx.To() != nil {
+// 									if tx.To().Hex() == key {
+// 										fmt.Println(tx)
+// 									}
+// 								}
+// 							}
+// 						}()
+// 					}
+// 				}
+// 		}
+// 	}
+// }
