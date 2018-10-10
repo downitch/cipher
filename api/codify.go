@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"crypto/aes"
 	"encoding/hex"
 	"errors"
@@ -90,9 +89,9 @@ func EncodeMessage(path string, client ethclient.Client, receiver string, msg st
 	nkey, _ := aes.NewCipher(decodedCipher)
 	nkey.Encrypt(blockDestination, bytedRandomBlockNum)
 
-	fmt.Println(string(blockDestination))
+	result := string(blockDestination) + "*:*" + string(destination)
 
-	return string(destination), nil
+	return result, nil
 }
 
 // func DecodeMessage(path string, sender string, msg string) (string, error) {
