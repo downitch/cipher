@@ -20,33 +20,18 @@ import(
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-type Client ethclient.Client
-
-type Account struct {
-	key string
-}
-
 // This function returns client instance that allows using infura 
 // gateway to communicate with the blockchain of Ethereum as if
 // geth was running locally with light sync
-func RunGeth() (ethclient.Client, ethclient.Client, error) {
+func RunGeth() (ethclient.Client, error) {
 	// dialing to main network of infura.io
 	httpsClient, err := ethclient.Dial("https://mainnet.infura.io")
 	if err != nil {
 		// returning empty instance and error
-  	return ethclient.Client{}, ethclient.Client{}, err
-	}
-	wsClient, err := ethclient.Dial("wss://mainnet.infura.io/ws")
-	if err != nil {
-		// returning empty instance and error
-  	return ethclient.Client{}, ethclient.Client{}, err
+  	return ethclient.Client{}, err
 	}
 	// returning client instance
-	return *httpsClient, *wsClient, nil
-}
-
-func Authorize(pkey string) Account {
-	return Account{pkey}
+	return *httpsClient, nil
 }
 
 // This functions requires ethclient entity and an address to
