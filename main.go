@@ -31,10 +31,10 @@ func main() {
 			return link, nil
 		case "send":
 			rec := strings.Join(request["recepient"], "")
-			// cb := api.GetCallbackLink(rec)
-			// if cb == "" {
-			// 	return "transaction didn't happen", nil
-			// }
+			cb := api.GetCallbackLink(rec)
+			if cb == "" {
+				return "transaction didn't happen", nil
+			}
 			msg := strings.Join(request["msg"], "")
 			key := strings.Join(request["key"], "")
 			emsg, _ := api.EncodeMessage("/history/history", httpsClient, rec, msg)
@@ -46,14 +46,19 @@ func main() {
 			// go func() {
 			// 	api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			// }()
+			api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			return tx, nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
 			balance := api.GetBalance(httpsClient, addr)
 			return balance, nil
 		case "notify":
-			// cb := strings.Join(request["callback"], "")
+			cb := strings.Join(request["callback"], "")
 			tx := strings.Join(request["tx"], "")
+			trimmedTx := strings.Split(tx, "x")[1]
+			decodedTx, _ := api.DecodeRawTx(trimmedTx)
+			fmt.Println(cb)
+			fmt.Println(decodedTx)
 			// emsg, err := api.ReadTx(tx)
 			// dmsg := api.Decode(emsg, addr)
 			return tx, nil

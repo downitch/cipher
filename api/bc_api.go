@@ -142,15 +142,14 @@ func SendMessageByBlockchain(client ethclient.Client, key string, msg string, re
  	return result, nil
 }
 
-func DecodeRawTx(rawTx string) (string, error) {
+func DecodeRawTx(rawTx string) ([]byte, error) {
 	var tx *types.Transaction
 	raw, err := hex.DecodeString(rawTx)
 	if err != nil {
 		return "can't parse raw tx", err
 	}
 	rlp.DecodeBytes(raw, &tx)
-	result := string(tx.Data())
-	return result, nil
+	return tx.Data(), nil
 }
 
 // DEPRECATED
