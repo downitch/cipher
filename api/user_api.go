@@ -15,6 +15,7 @@ func GetCallbackLink(address string) string {
 	}
 	data, err := ioutil.ReadFile(path + "/api/history/history")
 	lines := strings.Split(string(data), "\n")
+	lines = lines[:len(lines)-1]
 	for line := range lines {
 		step := strings.Split(lines[line], "*:*")[1]
 		if address == step {

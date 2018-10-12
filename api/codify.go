@@ -50,8 +50,8 @@ func parseCurrentCipher(path string, receiver string) (string, error) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		split := strings.Split(line, "*:*")
-		if split[0] == receiver {
-			return split[1], nil
+		if split[1] == receiver {
+			return split[2], nil
 		}
 	}
 	return "", errors.New("receiver not found")

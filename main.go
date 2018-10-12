@@ -28,11 +28,14 @@ func main() {
 		call := strings.Join(request["call"], "")
 		switch call {
 		case "id":
-			response := "welcome!"
-			return response, nil
+			return link, nil
 		case "send":
-			msg := strings.Join(request["msg"], "")
 			rec := strings.Join(request["recepient"], "")
+			// cb := api.GetCallbackLink(rec)
+			// if cb == "" {
+			// 	return "transaction didn't happen", nil
+			// }
+			msg := strings.Join(request["msg"], "")
 			key := strings.Join(request["key"], "")
 			emsg, _ := api.EncodeMessage("/history/history", httpsClient, rec, msg)
 			tx, err := api.SendMessageByBlockchain(httpsClient, key, emsg, rec)
@@ -40,10 +43,9 @@ func main() {
 				fmt.Println(err)
 				return "transaction didn't happen", err
 			}
-			cb := api.GetCallbackLink(rec)
-			go func() {
-				api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
-			}()
+			// go func() {
+			// 	api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			// }()
 			return tx, nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
