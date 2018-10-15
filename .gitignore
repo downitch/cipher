@@ -1,5 +1,6 @@
 .DS_Store
 api/hs/private_key
 api/hs/hostname
+api/hs/address
 api/torrc
 history/*

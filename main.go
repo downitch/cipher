@@ -9,26 +9,18 @@ import(
 
 func main() {
 
-	httpsClient, err := api.RunGeth()
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	go func() {
-		err = api.RunTorAndHS()
+		err := api.RunTorAndHS()
 		if err != nil {
 			fmt.Println(err)
 		}
 	}()
-
-	link := api.GetHSLink()
-	fmt.Println(link)
-
+	
 	api.RunRealServer(func(request map[string][]string) (string, error) {
 		call := strings.Join(request["call"], "")
 		switch call {
 		case "id":
-			return link, nil
+			return api.GetHSLink(), nil
 		case "send":
 			rec := strings.Join(request["recepient"], "")
 			cb := api.GetCallbackLink(rec)
@@ -36,32 +28,32 @@ func main() {
 				return "transaction didn't happen", nil
 			}
 			msg := strings.Join(request["msg"], "")
-			key := strings.Join(request["key"], "")
-			emsg, _ := api.EncodeMessage("/history/history", httpsClient, rec, msg)
-			tx, err := api.SendMessageByBlockchain(httpsClient, key, emsg, rec)
+			emsg, _ := api.CipherMessage(rec, msg)
+			tx, err := api.FormRawTxWithBlockchain(emsg, rec)
 			if err != nil {
 				fmt.Println(err)
 				return "transaction didn't happen", err
 			}
-			// go func() {
-			// 	api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
-			// }()
+			link := api.GetHSLink()
 			api.Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			return tx, nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
-			balance := api.GetBalance(httpsClient, addr)
+			balance := api.GetBalance(addr)
 			return balance, nil
 		case "notify":
 			cb := strings.Join(request["callback"], "")
 			tx := strings.Join(request["tx"], "")
 			trimmedTx := strings.Split(tx, "x")[1]
-			decodedTx, _ := api.DecodeRawTx(trimmedTx)
+			decodedTx, err := api.DecodeRawTx(trimmedTx)
+			if err != nil {
+				return "", err
+			}
 			fmt.Println(cb)
 			fmt.Println(decodedTx)
 			// emsg, err := api.ReadTx(tx)
 			// dmsg := api.Decode(emsg, addr)
-			return tx, nil
+			return "ok", nil
 		case "greeting":
 			addr := strings.Join(request["address"], "")
 			cb := strings.Join(request["callback"], "")
@@ -75,11 +67,17 @@ func main() {
 			if err != nil {
 				return "can't save user", nil
 			}
-			callbackResponse, err := api.Request(cb + "/?call=greetingOk&callback=" + link + "&address=0x9De9223eb770E377ab148B8d37Fee348E8D691bC&cipher=" + hexedCipher)
+			link := api.GetHSLink()
+			selfAddr := api.GetSelfAddress()
+			formattedUrl := fmt.Sprintf("%s/?call=greetingOk", cb)
+			formattedUrl = fmt.Sprintf("%s&callback=%s", formattedUrl, link)
+			formattedUrl = fmt.Sprintf("%s&address=%s", formattedUrl, selfAddr)
+			formattedUrl = fmt.Sprintf("%s&cipher=%s", formattedUrl, hexedCipher)
+			response, err := api.Request(formattedUrl)
 			if err != nil {
 				fmt.Println(err)
 			}
-			fmt.Println(callbackResponse)
+			fmt.Println(response)
 			return cipher, nil
 		case "greetingOk":
 			addr := strings.Join(request["address"], "")
@@ -89,7 +87,7 @@ func main() {
 			if err != nil {
 				return "can't save user", nil
 			}
-			return cipher, nil
+			return "ok", nil
 		default:
 			return "unrecognized call", nil
 		}

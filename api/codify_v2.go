@@ -9,15 +9,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 func GenRandomString(n int) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
 }
@@ -26,7 +24,7 @@ func appendByte(slice []byte, data ...byte) []byte {
 	m := len(slice)
 	n := m + len(data)
 	if n > cap(slice) {
-		newSlice := make([]byte, (n+1)*2)
+		newSlice := make([]byte, (n + 1) * 2)
 		copy(newSlice, slice)
 		slice = newSlice
 	}
@@ -57,49 +55,53 @@ func parseCurrentCipher(path string, receiver string) (string, error) {
 	return "", errors.New("receiver not found")
 }
 
-func EncodeMessage(path string, client ethclient.Client, receiver string, msg string) (string, error) {
-	realPath, _ := parsePath(path)
-
+func CipherMessage(receiver string, msg string) (string, error) {
+	// in order to have quick navigation we parse current path and concatenate it
+	// with the directory needed (between both, it adds /api/ since its subdir)
+	realPath, err := parsePath("/history/history")
+	// if it happened that the route can not be parsed, returns error
+	if err != nil {
+		return "", err
+	}
+	// after obtaining realPath we byte the message
 	bytedMsg := []byte(msg)
-
+	// byted message may vary slice length, so we check if its length is devidable
+	// by 32. we later add empty bytes to the slice in order to be sure
 	rest := len(bytedMsg) % 32
 	for i := 0; i < (32 - rest); i++ {
 		bytedMsg = appendByte(bytedMsg, 0)
 	}
-
+	// after bytedMsg have correct length we create one more slice for cipher
 	destination := make([]byte, len(bytedMsg))
-
-	latestBlock, _ := GetLatestBlock(client)
-	parsedLatestBlock, _ := strconv.Atoi(latestBlock)
-
-	randomBlockNum := rand.Intn(int(parsedLatestBlock - 1))
-	randomBlockNum += 1
-
-	stringifiedBlockNum := strconv.Itoa(randomBlockNum)
+	// obtaining random block and its number by order
+	block, random, _ := GetRandomBlock()
+	// converting block's number to string and to byte slice
+	stringifiedBlockNum := strconv.Itoa(random)
 	bytedRandomBlockNum := []byte(stringifiedBlockNum)
-
+	// byted block number may vary slice length so we check if its length is
+	// devidable by 32. we later add empty bytes to the slice in order to be sure
 	rest = len(bytedRandomBlockNum) % 32
 	for i := 0; i < (32 - rest); i++ {
 		bytedRandomBlockNum = appendByte(bytedRandomBlockNum, 0)
 	}
+	// after bytedRandomBlockNum has correct length we create one more slice
+	// for cipher
 	blockDestination := make([]byte, len(bytedRandomBlockNum))
-
-	block, _ := GetBlockHash(client, int64(randomBlockNum))
-
+	// parsing our database to get correct cipher from there
 	cipher, _ := parseCurrentCipher(realPath, receiver)
 	decodedCipher, _ := hex.DecodeString(cipher)
-
+	// parsing block hash to get correct cipher from there
 	newCipher := strings.Split(block, "x")[1]
 	newCipherDecoded, _ := hex.DecodeString(newCipher)
-
+	// encrypting with block hash the message
 	ekey, _ := aes.NewCipher(newCipherDecoded)
 	ekey.Encrypt(destination, bytedMsg)
-
+	// encrypting block number with constant cipher
 	nkey, _ := aes.NewCipher(decodedCipher)
 	nkey.Encrypt(blockDestination, bytedRandomBlockNum)
-
+	// concat both encoded parts with *:* as a result of the function
 	result := string(blockDestination) + "*:*" + string(destination)
-
+	// returning ideally encoded result back
 	return result, nil
 }
 

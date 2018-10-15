@@ -25,6 +25,17 @@ func GetCallbackLink(address string) string {
 	return ""
 }
 
+func GetSelfAddress() string {
+	path, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	data, err := ioutil.ReadFile(path + "/api/hs/address")
+	address := string(data)
+	formattedAddress := strings.Split(address, "\n")[0]
+	return formattedAddress
+}
+
 func CheckExistance(address string) error {
 	path, err := os.Getwd()
 	if err != nil {
