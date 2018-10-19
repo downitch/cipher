@@ -79,7 +79,7 @@ func RunTorAndHS() error {
 	if err != nil {
 		return err
 	}
-	p, _ := tor.New(context.Background(), "-f", path + "/api/torrc")
+	p, _ := tor.New(context.Background(), "-f", path + "/api/torrc", "--quiet")
 	p.Start()
 	return p.Wait()
 }

@@ -13,6 +13,7 @@ import(
 	"math/big"
 	"math/rand"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -38,14 +39,17 @@ func runGeth() (ethclient.Client, error) {
 // This functions requires ethclient entity and an address to
 // retireve current balance of the account from actual Blockchain
 func GetBalance(addr string) string {
-	client, _ := runGeth()
+	client, err := runGeth()
+	if err != nil {
+		return "0"
+	}
 	// Decoding hex string to address (EVM)
 	account := common.HexToAddress(addr)
 	// asking ethclient entity to return balance as result
 	balance, err := client.BalanceAt(context.Background(), account, nil)
 	// if any error happens returning empty string
 	if err != nil {
-		return ""
+		return "0"
 	}
 	// returning balance as a string
 	return fmt.Sprintf("%d", balance)
@@ -70,14 +74,15 @@ func GetBlockHash(number int64) (string, error) {
 	if err != nil {
 		return "", errors.New("can't parse block data")
 	}
-	return block.Hash().Hex(), nil
+	return strings.Split(block.Hash().Hex(), "x")[1], nil
 }
 
 func GetRandomBlock() (string, int, error) {
 	latest, _ := GetLatestBlock()
 	latestInt, _ := strconv.Atoi(latest)
-	prevInt := int(latestInt - 1)
-	randomInt := rand.Intn(prevInt) + 1
+	latestInt = latestInt - 1
+	randomInt := rand.Intn(latestInt)
+	randomInt = randomInt + 1
 	data, _ := GetBlockHash(int64(randomInt))
 	return data, randomInt, nil
 }
@@ -85,7 +90,7 @@ func GetRandomBlock() (string, int, error) {
 // This function will be later only available locally as it
 // formats, ciphers and sends the message from current wallet
 // to the recepients wallet address over ETH Blockchain
-func FormRawTxWithBlockchain(msg string, recepient string) (string, error) {
+func FormRawTxWithBlockchain(msg []byte, recepient string) (string, error) {
 	// parsing private key's ECDSA from hex string
 	key := GenRandomString(32)
 	hexedKey := Hexify(key)
@@ -93,13 +98,12 @@ func FormRawTxWithBlockchain(msg string, recepient string) (string, error) {
 	if err != nil {
 		return "can't parse key", err
 	}
-	fmt.Println(privateKey)
 	value := big.NewInt(int64(0))
 	nonce := uint64(0)
 	gasLimit := uint64(0)
 	gasPrice := big.NewInt(int64(0))
 	to := common.HexToAddress(recepient)
-	tx := types.NewTransaction(nonce, to, value, gasLimit, gasPrice, []byte(msg))
+	tx := types.NewTransaction(nonce, to, value, gasLimit, gasPrice, msg)
  	// signing the transaction before sending it
  	// it is required due to not using MetaMask
  	CID := big.NewInt(int64(1))

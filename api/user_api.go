@@ -25,6 +25,23 @@ func GetCallbackLink(address string) string {
 	return ""
 }
 
+func GetAddressByLink(link string) string {
+	path, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	data, err := ioutil.ReadFile(path + "/api/history/history")
+	lines := strings.Split(string(data), "\n")
+	lines = lines[:len(lines)-1]
+	for line := range lines {
+		step := strings.Split(lines[line], "*:*")[0]
+		if link == step {
+			return strings.Split(lines[line], "*:*")[1]
+		}
+	}
+	return ""
+}
+
 func GetSelfAddress() string {
 	path, err := os.Getwd()
 	if err != nil {

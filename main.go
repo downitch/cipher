@@ -28,7 +28,7 @@ func main() {
 				return "transaction didn't happen", nil
 			}
 			msg := strings.Join(request["msg"], "")
-			emsg, _ := api.CipherMessage(rec, msg)
+			emsg := api.CipherMessage(rec, msg)
 			tx, err := api.FormRawTxWithBlockchain(emsg, rec)
 			if err != nil {
 				fmt.Println(err)
@@ -43,16 +43,15 @@ func main() {
 			return balance, nil
 		case "notify":
 			cb := strings.Join(request["callback"], "")
+			addr := api.GetAddressByLink(cb)
 			tx := strings.Join(request["tx"], "")
 			trimmedTx := strings.Split(tx, "x")[1]
 			decodedTx, err := api.DecodeRawTx(trimmedTx)
 			if err != nil {
 				return "", err
 			}
-			fmt.Println(cb)
-			fmt.Println(decodedTx)
-			// emsg, err := api.ReadTx(tx)
-			// dmsg := api.Decode(emsg, addr)
+			res := api.DecipherMessage(addr, decodedTx)
+			fmt.Printf("%s\n", res)
 			return "ok", nil
 		case "greeting":
 			addr := strings.Join(request["address"], "")
