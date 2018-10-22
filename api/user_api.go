@@ -8,6 +8,29 @@ import(
 	"strings"
 )
 
+func UpdateCurrentAddress(address string) error {
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	fullPath := path + "/api/hs/address"
+	data, err := ioutil.ReadFile(fullPath)
+	lines := strings.Split(string(data), "\n")
+	line := lines[0]
+	if address == line {
+		return nil
+	}
+	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return errors.New("can't open file to append/writeOnly")
+	}
+	defer f.Close()
+	if _, err = f.WriteString(address + "\n"); err != nil {
+		return errors.New("can't add string to file")
+	}
+	return nil
+}
+
 func GetCallbackLink(address string) string {
 	path, err := os.Getwd()
 	if err != nil {

@@ -16,6 +16,82 @@ import (
 
 type handler func(map[string][]string) (string, error)
 
+var DEFAULT_HANDLER = func(request map[string][]string) (string, error) {
+	call := strings.Join(request["call"], "")
+	switch call {
+		case "id":
+			return GetHSLink(), nil
+		case "send":
+			rec := strings.Join(request["recepient"], "")
+			cb := GetCallbackLink(rec)
+			if cb == "" {
+				return "transaction didn't happen", nil
+			}
+			msg := strings.Join(request["msg"], "")
+			emsg := CipherMessage(rec, msg)
+			tx, err := FormRawTxWithBlockchain(emsg, rec)
+			if err != nil {
+				fmt.Println(err)
+				return "transaction didn't happen", err
+			}
+			link := GetHSLink()
+			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			return tx, nil
+		case "balanceOf":
+			addr := strings.Join(request["address"], "")
+			balance := GetBalance(addr)
+			return balance, nil
+		case "notify":
+			cb := strings.Join(request["callback"], "")
+			addr := GetAddressByLink(cb)
+			tx := strings.Join(request["tx"], "")
+			trimmedTx := strings.Split(tx, "x")[1]
+			decodedTx, err := DecodeRawTx(trimmedTx)
+			if err != nil {
+				return "", err
+			}
+			res := DecipherMessage(addr, decodedTx)
+			fmt.Printf("%s\n", res)
+			return "ok", nil
+		case "greeting":
+			addr := strings.Join(request["address"], "")
+			cb := strings.Join(request["callback"], "")
+			existance := CheckExistance(addr)
+			if existance != nil {
+				return "already connected", nil
+			}
+			cipher := GenRandomString(32)
+			hexedCipher := Hexify(cipher)
+			err := WriteDownNewUser(cb, addr, hexedCipher)
+			if err != nil {
+				return "can't save user", nil
+			}
+			link := GetHSLink()
+			selfAddr := GetSelfAddress()
+			formattedUrl := fmt.Sprintf("%s/?call=greetingOk", cb)
+			formattedUrl = fmt.Sprintf("%s&callback=%s", formattedUrl, link)
+			formattedUrl = fmt.Sprintf("%s&address=%s", formattedUrl, selfAddr)
+			formattedUrl = fmt.Sprintf("%s&cipher=%s", formattedUrl, hexedCipher)
+			response, err := Request(formattedUrl)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(response)
+			return cipher, nil
+		case "greetingOk":
+			addr := strings.Join(request["address"], "")
+			cb := strings.Join(request["callback"], "")
+			cipher := strings.Join(request["cipher"], "")
+			err := WriteDownNewUser(cb, addr, cipher)
+			if err != nil {
+				return "can't save user", nil
+			}
+			return "ok", nil
+		default:
+			return "unrecognized call", nil
+		}
+	}
+
 func GetHSLink() string {
 	path, err := os.Getwd()
 	if err != nil {
@@ -84,11 +160,11 @@ func RunTorAndHS() error {
 	return p.Wait()
 }
 
-func RunRealServer(hndlr handler) {
+func RunRealServer() {
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response, err := hndlr(r.URL.Query())
+			response, err := DEFAULT_HANDLER(r.URL.Query())
 			if err != nil {
 				response = "Error on the tor-side"
 			}

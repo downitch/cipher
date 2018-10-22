@@ -89,6 +89,8 @@ func parseCurrentCipher(path string, receiver string) (string, error) {
 	return "", errors.New("receiver not found")
 }
 
+
+
 func CipherMessage(receiver string, msg string) []byte {
 	realPath, err := parsePath("/history/history")
 	// if it happened that the route can not be parsed, returns error
