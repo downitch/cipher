@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	random "math/rand"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -67,14 +66,6 @@ func bytifyString(str string) []byte {
 	return result
 }
 
-func parsePath(path string) (string, error) {
-	fullPath, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return fullPath + "/api" + path, nil
-}
-
 func parseCurrentCipher(path string, receiver string) (string, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -91,17 +82,15 @@ func parseCurrentCipher(path string, receiver string) (string, error) {
 
 
 
-func CipherMessage(receiver string, msg string) []byte {
-	realPath, err := parsePath("/history/history")
-	// if it happened that the route can not be parsed, returns error
-	if err != nil {
-		return []byte{}
-	}
+func (c *Commander) CipherMessage(receiver string, msg string) []byte {
+	realPath := c.ConstantPath + "/history/history"
 	// now all the encryption works only with byte slices
 	bytedMessage := []byte(msg)
 	// b represents message
 	b := base64.StdEncoding.EncodeToString(bytedMessage)
-	randomCipher, number, _ := GetRandomBlock()
+	rblock, _ := GetRandomBlock()
+	randomCipher := rblock.hash
+	number := rblock.number
 	strNumber := strconv.Itoa(number)
 	// n represents blockchain's block number
 	n := base64.StdEncoding.EncodeToString([]byte(strNumber))
@@ -138,16 +127,12 @@ func CipherMessage(receiver string, msg string) []byte {
 	return result
 }
 
-func DecipherMessage(receiver string, msg []byte) []byte {
+func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	strMsg := stringifySlice(msg)
 	split := strings.Split(strMsg, " 42 58 42 ")
 	num := bytifyString(split[0])
 	msg = bytifyString(split[1])
-	realPath, err := parsePath("/history/history")
-	// if it happened that the route can not be parsed, returns error
-	if err != nil {
-		return []byte{}
-	}
+	realPath := c.ConstantPath + "/history/history"
 	// parsing our database to get correct cipher from there
 	constCipher, _ := parseCurrentCipher(realPath, receiver)
 	decodedCipher, _ := hex.DecodeString(constCipher)

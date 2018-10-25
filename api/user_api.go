@@ -8,12 +8,9 @@ import(
 	"strings"
 )
 
-func UpdateCurrentAddress(address string) error {
-	path, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	fullPath := path + "/api/hs/address"
+func (c *Commander) UpdateCurrentAddress(address string) error {
+	path := c.ConstantPath
+	fullPath := path + "/hs/address"
 	data, err := ioutil.ReadFile(fullPath)
 	lines := strings.Split(string(data), "\n")
 	line := lines[0]
@@ -31,12 +28,9 @@ func UpdateCurrentAddress(address string) error {
 	return nil
 }
 
-func GetCallbackLink(address string) string {
-	path, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	data, err := ioutil.ReadFile(path + "/api/history/history")
+func (c *Commander) GetCallbackLink(address string) string {
+	path := c.ConstantPath
+	data, _ := ioutil.ReadFile(path + "/history/history")
 	lines := strings.Split(string(data), "\n")
 	lines = lines[:len(lines)-1]
 	for line := range lines {
@@ -48,12 +42,9 @@ func GetCallbackLink(address string) string {
 	return ""
 }
 
-func GetAddressByLink(link string) string {
-	path, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	data, err := ioutil.ReadFile(path + "/api/history/history")
+func (c *Commander) GetAddressByLink(link string) string {
+	path := c.ConstantPath
+	data, _ := ioutil.ReadFile(path + "/history/history")
 	lines := strings.Split(string(data), "\n")
 	lines = lines[:len(lines)-1]
 	for line := range lines {
@@ -65,28 +56,22 @@ func GetAddressByLink(link string) string {
 	return ""
 }
 
-func GetSelfAddress() string {
-	path, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	data, err := ioutil.ReadFile(path + "/api/hs/address")
+func (c *Commander) GetSelfAddress() string {
+	path := c.ConstantPath
+	data, _ := ioutil.ReadFile(path + "/hs/address")
 	address := string(data)
 	formattedAddress := strings.Split(address, "\n")[0]
 	return formattedAddress
 }
 
-func CheckExistance(address string) error {
-	path, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	data, err := ioutil.ReadFile(path + "/api/history/history")
+func (c *Commander) CheckExistance(link string) error {
+	path := c.ConstantPath
+	data, _ := ioutil.ReadFile(path + "/history/history")
 	lines := strings.Split(string(data), "\n")
 	lines = lines[:len(lines)-1]
 	for line := range lines {
-		step := strings.Split(lines[line], "*:*")[1]
-		if address == step {
+		step := strings.Split(lines[line], "*:*")[0]
+		if link == step {
 			return errors.New("found user")
 		}
 	}
@@ -97,12 +82,9 @@ func Hexify(source string) string {
 	return hex.EncodeToString([]byte(source))
 }
 
-func WriteDownNewUser(cb string, address string, cipher string) error {
-	path, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	fullPath := path + "/api/history/history"
+func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) error {
+	path := c.ConstantPath
+	fullPath := path + "/history/history"
 	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return errors.New("can't open file to append/writeOnly")

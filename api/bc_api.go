@@ -22,6 +22,11 @@ import(
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+type RandomBlock struct {
+	hash   string
+	number int
+}
+
 // This function returns client instance that allows using infura 
 // gateway to communicate with the blockchain of Ethereum as if
 // geth was running locally with light sync
@@ -52,7 +57,9 @@ func GetBalance(addr string) string {
 		return "0"
 	}
 	// returning balance as a string
-	return fmt.Sprintf("%d", balance)
+	b := fmt.Sprintf("%d", balance)
+	fmt.Println(b)
+	return b
 }
 
 
@@ -77,14 +84,14 @@ func GetBlockHash(number int64) (string, error) {
 	return strings.Split(block.Hash().Hex(), "x")[1], nil
 }
 
-func GetRandomBlock() (string, int, error) {
+func GetRandomBlock() (RandomBlock, error) {
 	latest, _ := GetLatestBlock()
 	latestInt, _ := strconv.Atoi(latest)
 	latestInt = latestInt - 1
 	randomInt := rand.Intn(latestInt)
 	randomInt = randomInt + 1
 	data, _ := GetBlockHash(int64(randomInt))
-	return data, randomInt, nil
+	return RandomBlock{ data, randomInt }, nil
 }
 
 // This function will be later only available locally as it
