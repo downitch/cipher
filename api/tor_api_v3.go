@@ -1,11 +1,14 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"os"
 	"os/exec"
+	"runtime"
+	"strings"
 
 	"golang.org/x/net/proxy"
 )
@@ -39,7 +42,11 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 				return "transaction didn't happen", err
 			}
 			link := c.GetHSLink()
-			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			if saved := c.SaveMessage(msg, rec); saved != true {
+				Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			} else {
+				return "", errors.New("Can't save message")
+			}
 			return tx, nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
@@ -55,8 +62,12 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 				return "", err
 			}
 			res := c.DecipherMessage(addr, decodedTx)
-			fmt.Printf("%s\n", res)
-			return "ok", nil
+			m := fmt.Sprintf("%s", res)
+			if saved := c.SaveMessage(m, addr); saved != true {
+				fmt.Printf(m)
+				return "ok", nil
+			}
+			return "", errors.New("Can't save message")
 		case "greeting":
 			cb := strings.Join(request["callback"], "")
 			existance := c.CheckExistance(cb)
@@ -96,8 +107,9 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 
 func (c *Commander) ConfigureTorrc() error {
 	path := c.ConstantPath
+	hsPath := fmt.Sprintf("%s/hs", path)
   // formatting onion service setup
-	settings := fmt.Sprintf("HiddenServiceDir %s/hs", path)
+	settings := fmt.Sprintf("HiddenServiceDir %s", hsPath)
 	settings = fmt.Sprintf("%s\nHiddenServicePort 80 127.0.0.1:4887", settings)
 	// either creating a new file or writing to one that exists
 	err := ioutil.WriteFile(path + "/torrc", []byte(settings), 0644)
@@ -105,11 +117,12 @@ func (c *Commander) ConfigureTorrc() error {
 		return err
 	}
 	// chmodding directory where application is running
-	command := fmt.Sprintf("chmod 700 %s/hs", path)
-	if _, err := exec.Command("sh", "-c", command).Output(); err != nil {
-		return err
+	switch runtime.GOOS {
+	case "windows":
+		return os.Chmod(hsPath, 0600)
+	default:
+		return os.Chmod(hsPath, 0700)
 	}
-	return nil
 }
 
 func (c *Commander) GetHSLink() string {
@@ -149,8 +162,13 @@ func Request(url string) (string, error) {
 }
 
 func (c *Commander) RunTorAndHS() {
-	command := "cd "+c.ConstantPath+" && ./tor -f "+c.ConstantPath+"/torrc"
-	exec.Command("sh", "-c", command).Output()
+	switch runtime.GOOS {
+	case "windows":
+		return
+	default:
+		command := "cd "+c.ConstantPath+" && ./tor -f "+c.ConstantPath+"/torrc"
+		exec.Command("sh", "-c", command).Output()
+	}
 }
 
 func (c *Commander) RunRealServer() {

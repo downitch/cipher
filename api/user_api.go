@@ -5,7 +5,9 @@ import(
 	"errors"
 	"os"
 	"io/ioutil"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func (c *Commander) UpdateCurrentAddress(address string) error {
@@ -82,10 +84,32 @@ func Hexify(source string) string {
 	return hex.EncodeToString([]byte(source))
 }
 
+func (c *Commander) SaveMessage(message string, address string) bool {
+	path := c.ConstantPath
+	fullPath := path + "/history/" + address
+	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	currentTime := strconv.Itoa(int(time.Now().UnixNano() / 1000000))
+	text := currentTime + "*:*" + address + "*:*" + message + "\n"
+	if _, err = f.WriteString(text); err != nil {
+		return false
+	}
+	return true
+}
+
 func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) error {
 	path := c.ConstantPath
-	fullPath := path + "/history/history"
-	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
+	fullPath := path + "/history/" + address
+	f, err := os.Create(fullPath)
+	if err != nil {
+		return errors.New("can't create history file")
+	}
+	f.Close()
+	fullPath = path + "/history/history"
+	f, err = os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return errors.New("can't open file to append/writeOnly")
 	}
