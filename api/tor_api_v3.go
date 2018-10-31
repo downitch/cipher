@@ -70,6 +70,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			return "", errors.New("Can't save message")
 		case "greeting":
 			cb := strings.Join(request["callback"], "")
+			cb = fmt.Sprintf("%s.onion", cb)
 			existance := c.CheckExistance(cb)
 			if existance != nil {
 				return "already connected", nil
@@ -77,6 +78,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			cipher := GenRandomString(32)
 			hexedCipher := Hexify(cipher)
 			link := c.GetHSLink()
+			link = strings.Split(link, ".")[0]
 			selfAddr := c.GetSelfAddress()
 			formattedUrl := fmt.Sprintf("%s/?call=greetingOk", cb)
 			formattedUrl = fmt.Sprintf("%s&callback=%s", formattedUrl, link)
@@ -94,6 +96,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		case "greetingOk":
 			addr := strings.Join(request["address"], "")
 			cb := strings.Join(request["callback"], "")
+			cb = fmt.Sprintf("%s.onion", cb)
 			cipher := strings.Join(request["cipher"], "")
 			err := c.WriteDownNewUser(cb, addr, cipher)
 			if err != nil {
