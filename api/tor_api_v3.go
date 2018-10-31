@@ -42,7 +42,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 				return "transaction didn't happen", err
 			}
 			link := c.GetHSLink()
-			if saved := c.SaveMessage(msg, rec); saved != true {
+			if saved := c.SaveMessage(msg, rec); saved != false {
 				Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			} else {
 				return "", errors.New("Can't save message")
@@ -63,7 +63,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			}
 			res := c.DecipherMessage(addr, decodedTx)
 			m := fmt.Sprintf("%s", res)
-			if saved := c.SaveMessage(m, addr); saved != true {
+			if saved := c.SaveMessage(m, addr); saved != false {
 				fmt.Printf(m)
 				return "ok", nil
 			}
