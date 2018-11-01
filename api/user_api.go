@@ -1,6 +1,7 @@
 package api
 
 import(
+	"fmt"
 	"bufio"
 	"encoding/hex"
 	"errors"
@@ -114,6 +115,7 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	fullPath := path + "/history/" + addr
 	file, err := os.Open(fullPath)
 	if err != nil {
+		fmt.Println(err)
 	  return []Message{}, err
 	}
 	defer file.Close()
@@ -130,6 +132,7 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 		position = position + 1
 	}
 	if err := scanner.Err(); err != nil {
+		fmt.Println(err)
 		return []Message{}, err
 	}
 	return messages, nil
