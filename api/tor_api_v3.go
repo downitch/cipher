@@ -51,26 +51,30 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			}
 			return tx, nil
 		case "inbox":
-			var response string
+			response := ""
 			addr := strings.Join(request["address"], "")
 			amount, err := strconv.Atoi(strings.Join(request["amount"], ""))
 			if err != nil {
-				return "", err
+				return "[]", err
 			}
 			offset, err := strconv.Atoi(strings.Join(request["offset"], ""))
 			if err != nil {
-				return "", err
+				return "[]", err
 			}
 			messages, err := c.GetMessages(addr, []int{amount, offset})
 			if err != nil {
-				return "", err
+				return "[]", err
 			}
-			for m := range messages {
-				out, err := json.Marshal(messages[m])
-				if err != nil {
-					return "", err
+			if len(messages) != 0 {
+				for m := range messages {
+					out, err := json.Marshal(messages[m])
+					if err != nil {
+						return "[]", err
+					}
+					response = fmt.Sprintf("%s%s,", response, string(out))
 				}
-				response = fmt.Sprintf("%s%s\n", response, string(out))
+				response = response[:len(response) - 1]
+				response = "[" + response + "]"
 			}
 			return response, nil
 		case "balanceOf":
