@@ -12,9 +12,9 @@ import(
 )
 
 type Message struct {
-	Date int
-	Text string
-	Author string
+	Date int				`json:"date"`
+	Text string 		`json:"text"`
+	Author string 	`json:"author"`
 }
 
 func (c *Commander) UpdateCurrentAddress(address string) error {
