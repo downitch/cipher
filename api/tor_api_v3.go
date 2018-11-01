@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"strconv"
 
 	"golang.org/x/net/proxy"
 )
@@ -48,6 +50,29 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 				return "", errors.New("Can't save message")
 			}
 			return tx, nil
+		case "inbox":
+			var response string
+			addr := strings.Join(request["address"], "")
+			amount, err := strconv.Atoi(strings.Join(request["amount"], ""))
+			if err != nil {
+				return "", err
+			}
+			offset, err := strconv.Atoi(strings.Join(request["offset"], ""))
+			if err != nil {
+				return "", err
+			}
+			messages, err := c.GetMessages(addr, []int{amount, offset})
+			if err != nil {
+				return "", err
+			}
+			for m := range messages {
+				out, err := json.Marshal(messages[m])
+				if err != nil {
+					return "", err
+				}
+				response = fmt.Sprintf("%s%s\n", response, string(out))
+			}
+			return response, nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
 			balance := GetBalance(addr)

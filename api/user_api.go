@@ -1,6 +1,7 @@
 package api
 
 import(
+	"bufio"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -9,6 +10,12 @@ import(
 	"strings"
 	"time"
 )
+
+type Message struct {
+	Date int
+	Text string
+	Author string
+}
 
 func (c *Commander) UpdateCurrentAddress(address string) error {
 	path := c.ConstantPath
@@ -98,6 +105,34 @@ func (c *Commander) SaveMessage(message string, address string) bool {
 		return false
 	}
 	return true
+}
+
+func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
+	var messages []Message
+	var position int
+	path := c.ConstantPath
+	fullPath := path + "/history/" + addr
+	file, err := os.Open(fullPath)
+	if err != nil {
+	  return []Message{}, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		if position >= pos[1] && (position - pos[1]) < pos[0] {
+			txt := scanner.Text()
+			split := strings.Split(txt, "*:*")
+			date, _ := strconv.Atoi(split[0])
+			author := split[1]
+			text := split[2]
+			messages = append(messages, Message{date, text, author})
+		}
+		position = position + 1
+	}
+	if err := scanner.Err(); err != nil {
+		return []Message{}, err
+	}
+	return messages, nil
 }
 
 func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) error {
