@@ -25,6 +25,10 @@ func NewCommander(path string) *Commander {
 	return &Commander{ ConstantPath: path }
 }
 
+func (c *Commander) ChangeCommanderPath(path string) {
+	c.ConstantPath = path
+}
+
 var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, error) {
 	call := strings.Join(request["call"], "")
 	switch call {
@@ -116,7 +120,9 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			if err != nil {
 				return fmt.Sprintf(`{"res": "nil", "error": "%s"}`, err), err
 			}
-			err = c.WriteDownNewUser(cb, response, hexedCipher)
+			addressToSave := strings.Split(response, `": "`)[1]
+			addressToSave = strings.Split(addressToSave, `", "`)[0]
+			err = c.WriteDownNewUser(cb, addressToSave, hexedCipher)
 			if err != nil {
 				return `{"res": "nil", "error": "can't save user"}`, nil
 			}
