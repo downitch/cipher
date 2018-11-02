@@ -13,7 +13,36 @@ import (
 	random "math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/pierrec/lz4"
 )
+
+func CompressData(ssource string) []byte {
+	source := []byte(ssource)
+	compressed := make([]byte, len(source))
+	_, err := lz4.CompressBlockHC(source, compressed, 0)
+	if err != nil {
+		return source
+	}
+	compressed, err = trimNullBytes(compressed)
+	if err != nil {
+		return source
+	}
+	return compressed
+}
+
+func DecompressData(source []byte) string {
+	decompressed := make([]byte, len(source) * 10)
+	_, err := lz4.UncompressBlock(source, decompressed)
+	if err != nil {
+		return string(source)
+	}
+	decompressedTrimmed, err := trimNullBytes(decompressed)
+	if err != nil {
+		return string(decompressed)
+	}
+	return string(decompressedTrimmed)
+}
 
 func GenRandomString(n int) string {
 	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -37,15 +66,15 @@ func appendByte(slice []byte, data ...byte) []byte {
 	return slice
 }
 
-func trimNullBytes(slice []byte) []byte {
+func trimNullBytes(slice []byte) ([]byte, error) {
 	l := len(slice)
 	l -= 1
 	for i := l; i >= 0; i-- {
 		if slice[i] != 0 {
-			return slice[:i+1]
+			return slice[:i+1], nil
 		}
 	}
-	return []byte{}
+	return slice, errors.New("Can't trim null bytes")
 }
 
 func stringifySlice(slice []byte) string {
