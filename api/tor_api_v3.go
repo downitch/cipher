@@ -206,11 +206,7 @@ func (c *Commander) RunRealServer() {
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response, err := DEFAULT_HANDLER(r.URL.Query(), c)
-			if err != nil {
-				fmt.Println(err)
-				response = "Error on the tor-side"
-			}
+			response, _ := DEFAULT_HANDLER(r.URL.Query(), c)
 			// sending back the response as web-server answer
 			w.Write([]byte(response))
 		})}
