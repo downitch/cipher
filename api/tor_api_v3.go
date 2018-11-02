@@ -29,58 +29,58 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 	call := strings.Join(request["call"], "")
 	switch call {
 		case "id":
-			return c.GetHSLink(), nil
+			return fmt.Sprintf("{\"res\": \"%s\", \"error\": nil}", c.GetHSLink()), nil
 		case "send":
 			rec := strings.Join(request["recepient"], "")
 			cb := c.GetCallbackLink(rec)
 			if cb == "" {
-				return "transaction didn't happen", nil
+				return "{\"res\": nil, \"error\": \"transaction didn't happen\"}", nil
 			}
 			msg := strings.Join(request["msg"], "")
 			emsg := c.CipherMessage(rec, msg)
 			tx, err := FormRawTxWithBlockchain(emsg, rec)
 			if err != nil {
 				fmt.Println(err)
-				return "transaction didn't happen", err
+				return "{\"res\": nil, \"error\": \"transaction didn't happen\"}", err
 			}
 			link := c.GetHSLink()
 			if saved := c.SaveMessage(msg, rec); saved != false {
 				Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			} else {
-				return "", errors.New("Can't save message")
+				return "{\"res\": nil, \"error\": \"can't save message\"}", errors.New("can't save message")
 			}
-			return tx, nil
+			return fmt.Sprintf("{\"res\": \"%s\", \"error\": nil}", tx), nil
 		case "inbox":
 			response := ""
 			addr := strings.Join(request["address"], "")
 			amount, err := strconv.Atoi(strings.Join(request["amount"], ""))
 			if err != nil {
-				return "[]", err
+				return "{\"res\": nil, \"error\": \"can't convert amount to integer\"}", err
 			}
 			offset, err := strconv.Atoi(strings.Join(request["offset"], ""))
 			if err != nil {
-				return "[]", err
+				return "{\"res\": nil, \"error\": \"can't convert offset to integer\"}", err
 			}
 			messages, err := c.GetMessages(addr, []int{amount, offset})
 			if err != nil {
-				return "[]", err
+				return "{\"res\": nil, \"error\": \"can't get messages\"}", err
 			}
 			if len(messages) != 0 {
 				for m := range messages {
 					out, err := json.Marshal(messages[m])
 					if err != nil {
-						return "[]", err
+						return fmt.Sprintf("{\"res\": nil, \"error\": \"can't parse message #%d\"}", m), err
 					}
 					response = fmt.Sprintf("%s%s,", response, string(out))
 				}
 				response = response[:len(response) - 1]
 				response = "[" + response + "]"
 			}
-			return response, nil
+			return fmt.Sprintf("{\"res\": %s, \"error\": nil}", response), nil
 		case "balanceOf":
 			addr := strings.Join(request["address"], "")
 			balance := GetBalance(addr)
-			return balance, nil
+			return fmt.Sprintf("{\"res\": \"%s\", \"error\": nil}", balance), nil
 		case "notify":
 			cb := strings.Join(request["callback"], "")
 			addr := c.GetAddressByLink(cb)
@@ -88,21 +88,20 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			trimmedTx := strings.Split(tx, "x")[1]
 			decodedTx, err := DecodeRawTx(trimmedTx)
 			if err != nil {
-				return "", err
+				return "{\"res\": nil, \"error\": \"can't decode tx\"}", err
 			}
 			res := c.DecipherMessage(addr, decodedTx)
 			m := fmt.Sprintf("%s", res)
 			if saved := c.SaveMessage(m, addr); saved != false {
-				fmt.Printf(m)
-				return "ok", nil
+				return "{\"res\": \"ok\", \"error\": nil}", nil
 			}
-			return "", errors.New("Can't save message")
+			return "{\"res\": nil, \"error\": \"can't save message\"}", errors.New("Can't save message")
 		case "greeting":
 			cb := strings.Join(request["callback"], "")
 			cb = fmt.Sprintf("%s.onion", cb)
 			existance := c.CheckExistance(cb)
 			if existance != nil {
-				return "already connected", nil
+				return "{\"res\": nil, \"error\": \"already connected\"}", nil
 			}
 			cipher := GenRandomString(32)
 			hexedCipher := Hexify(cipher)
@@ -115,13 +114,13 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			formattedUrl = fmt.Sprintf("%s&cipher=%s", formattedUrl, hexedCipher)
 			response, err := Request(formattedUrl)
 			if err != nil {
-				fmt.Println(err)
+				return fmt.Sprintf("{\"res\": nil, \"error\": \"%s\"}", err), err
 			}
 			err = c.WriteDownNewUser(cb, response, hexedCipher)
 			if err != nil {
-				return "can't save user", nil
+				return "{\"res\": nil, \"error\": \"can't save user\"}", nil
 			}
-			return "ok", nil
+			return "{\"res\": \"ok\", \"error\": nil}", nil
 		case "greetingOk":
 			addr := strings.Join(request["address"], "")
 			cb := strings.Join(request["callback"], "")
@@ -129,11 +128,11 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			cipher := strings.Join(request["cipher"], "")
 			err := c.WriteDownNewUser(cb, addr, cipher)
 			if err != nil {
-				return "can't save user", nil
+				return "{\"res\": nil, \"error\": \"can't save user\"}", nil
 			}
-			return c.GetSelfAddress(), nil
+			return fmt.Sprintf("{\"res\": \"%s\", \"error\": nil}", c.GetSelfAddress()), nil
 		default:
-			return "unrecognized call", nil
+			return "{\"res\": nil, \"error\": \"unrecognized call\"}", nil
 		}
 	}
 
