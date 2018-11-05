@@ -15,6 +15,7 @@ Cipher Golang API is tightly used inside the project. It is responsible for all 
 
 
 You can also:
+
   - Communicate with blockchain, using Infura.io
   - Generate Private Keys used for signing transactions
   - Exchange passphrases using secure TOR Hidden Service protocol
