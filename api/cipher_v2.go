@@ -188,10 +188,22 @@ func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	if err != nil {
 		return []byte{}
 	}
-	blockNumber, _ := strconv.Atoi(string(data))
-	hash, _ := GetBlockHash(int64(blockNumber))
-	decodedCipher, _ = Dehexify(hash)
-	block, _ = aes.NewCipher(decodedCipher)
+	blockNumber, err := strconv.Atoi(string(data))
+	if err != nil {
+		return []byte{}
+	}
+	hash, err := GetBlockHash(int64(blockNumber))
+	if err != nil {
+		return []byte{}
+	}
+	decodedCipher, err = Dehexify(hash)
+	if err != nil {
+		return []byte{}
+	}
+	block, err = aes.NewCipher(decodedCipher)
+	if err != nil {
+		return []byte{}
+	}
 	if len(msg) < aes.BlockSize {
 		return []byte{}
 	}
