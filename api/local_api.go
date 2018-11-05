@@ -1,9 +1,7 @@
 package api
 
 import(
-	"fmt"
 	"bufio"
-	"encoding/hex"
 	"errors"
 	"os"
 	"io/ioutil"
@@ -13,29 +11,18 @@ import(
 )
 
 type Message struct {
-	Date int				`json:"date"`
-	Text string 		`json:"text"`
-	Author string 	`json:"author"`
+	Date int			`json:"date"`
+	Text string 	`json:"text"`
+	Author string `json:"author"`
 }
 
-func (c *Commander) UpdateCurrentAddress(address string) error {
-	path := c.ConstantPath
-	fullPath := path + "/hs/address"
-	data, err := ioutil.ReadFile(fullPath)
-	lines := strings.Split(string(data), "\n")
-	line := lines[0]
-	if address == line {
-		return nil
-	}
-	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return errors.New("can't open file to append/writeOnly")
-	}
-	defer f.Close()
-	if _, err = f.WriteString(address + "\n"); err != nil {
-		return errors.New("can't add string to file")
-	}
-	return nil
+type NewMessage struct {
+	Type     string `json:"type"`
+	Date     int		`json:"date"`
+	Text     string `json:"text"`
+	Author   string `json:"author"`
+	Sent     bool   `json:"sent"`
+	Received bool   `json:"received"`
 }
 
 func (c *Commander) GetCallbackLink(address string) string {
@@ -74,40 +61,6 @@ func (c *Commander) GetSelfAddress() string {
 	return formattedAddress
 }
 
-func (c *Commander) CheckExistance(link string) error {
-	path := c.ConstantPath
-	data, _ := ioutil.ReadFile(path + "/history/history")
-	lines := strings.Split(string(data), "\n")
-	lines = lines[:len(lines)-1]
-	for line := range lines {
-		step := strings.Split(lines[line], "*:*")[0]
-		if link == step {
-			return errors.New("found user")
-		}
-	}
-	return nil
-}
-
-func Hexify(source string) string {
-	return hex.EncodeToString([]byte(source))
-}
-
-func (c *Commander) SaveMessage(message string, address string) bool {
-	path := c.ConstantPath
-	fullPath := path + "/history/" + address
-	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	currentTime := strconv.Itoa(int(time.Now().UnixNano() / 1000000))
-	text := currentTime + "*:*" + address + "*:*" + message + "\n"
-	if _, err = f.WriteString(text); err != nil {
-		return false
-	}
-	return true
-}
-
 func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	var messages []Message
 	var position int
@@ -115,7 +68,6 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	fullPath := path + "/history/" + addr
 	file, err := os.Open(fullPath)
 	if err != nil {
-		fmt.Println(err)
 	  return []Message{}, err
 	}
 	defer file.Close()
@@ -132,10 +84,59 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 		position = position + 1
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Println(err)
 		return []Message{}, err
 	}
 	return messages, nil
+}
+
+func (c *Commander) UpdateCurrentAddress(address string) error {
+	path := c.ConstantPath
+	fullPath := path + "/hs/address"
+	data, err := ioutil.ReadFile(fullPath)
+	lines := strings.Split(string(data), "\n")
+	line := lines[0]
+	if address == line {
+		return nil
+	}
+	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return errors.New("can't open file to append/writeOnly")
+	}
+	defer f.Close()
+	if _, err = f.WriteString(address + "\n"); err != nil {
+		return errors.New("can't add string to file")
+	}
+	return nil
+}
+
+func (c *Commander) CheckExistance(link string) error {
+	path := c.ConstantPath
+	data, _ := ioutil.ReadFile(path + "/history/history")
+	lines := strings.Split(string(data), "\n")
+	lines = lines[:len(lines)-1]
+	for line := range lines {
+		step := strings.Split(lines[line], "*:*")[0]
+		if link == step {
+			return errors.New("found user")
+		}
+	}
+	return nil
+}
+
+func (c *Commander) SaveMessage(message string, address string) bool {
+	path := c.ConstantPath
+	fullPath := path + "/history/" + address
+	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	currentTime := strconv.Itoa(int(time.Now().UnixNano() / 1000000))
+	text := currentTime + "*:*" + address + "*:*" + message + "\n"
+	if _, err = f.WriteString(text); err != nil {
+		return false
+	}
+	return true
 }
 
 func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) error {

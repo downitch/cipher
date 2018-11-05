@@ -95,6 +95,19 @@ func bytifyString(str string) []byte {
 	return result
 }
 
+func Hexify(source interface{}) string {
+	if str, ok := source.(string); ok {
+    return hex.EncodeToString([]byte(str))
+	}
+	b, _ := source.([]byte)
+	return hex.EncodeToString(b)
+}
+
+func Dehexify(source string) ([]byte, error) {
+	result, err := hex.DecodeString(source)
+	return []byte(result), err
+}
+
 func parseCurrentCipher(path string, receiver string) (string, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -109,8 +122,6 @@ func parseCurrentCipher(path string, receiver string) (string, error) {
 	return "", errors.New("receiver not found")
 }
 
-
-
 func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 	realPath := c.ConstantPath + "/history/history"
 	// now all the encryption works only with byte slices
@@ -123,11 +134,11 @@ func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 	strNumber := strconv.Itoa(number)
 	// n represents blockchain's block number
 	n := base64.StdEncoding.EncodeToString([]byte(strNumber))
-	decodedRandomCipher, _ := hex.DecodeString(randomCipher)
+	decodedRandomCipher, _ := Dehexify(randomCipher)
 	randomBlock, _ := aes.NewCipher(decodedRandomCipher)
 	// parsing our database to get correct cipher from there
 	constCipher, _ := parseCurrentCipher(realPath, receiver)
-	decodedCipher, _ := hex.DecodeString(constCipher)
+	decodedCipher, _ := Dehexify(constCipher)
 	constBlock, _ := aes.NewCipher(decodedCipher)
 	// creating variable that will contain encrypted number
 	ciphernumber := make([]byte, aes.BlockSize+len(n))
@@ -164,7 +175,7 @@ func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	realPath := c.ConstantPath + "/history/history"
 	// parsing our database to get correct cipher from there
 	constCipher, _ := parseCurrentCipher(realPath, receiver)
-	decodedCipher, _ := hex.DecodeString(constCipher)
+	decodedCipher, _ := Dehexify(constCipher)
 	block, _ := aes.NewCipher(decodedCipher)
 	if len(num) < aes.BlockSize {
 		return []byte{}
@@ -179,7 +190,7 @@ func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	}
 	blockNumber, _ := strconv.Atoi(string(data))
 	hash, _ := GetBlockHash(int64(blockNumber))
-	decodedCipher, _ = hex.DecodeString(hash)
+	decodedCipher, _ = Dehexify(hash)
 	block, _ = aes.NewCipher(decodedCipher)
 	if len(msg) < aes.BlockSize {
 		return []byte{}

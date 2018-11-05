@@ -8,7 +8,6 @@ package api
 import(
 	"fmt"
 	"context"
-	"encoding/hex"
 	"errors"
 	"math/big"
 	"math/rand"
@@ -58,10 +57,8 @@ func GetBalance(addr string) string {
 	}
 	// returning balance as a string
 	b := fmt.Sprintf("%d", balance)
-	fmt.Println(b)
 	return b
 }
-
 
 // This function returns current block header hash
 func GetLatestBlock() (string, error) {
@@ -120,15 +117,17 @@ func FormRawTxWithBlockchain(msg []byte, recepient string) (string, error) {
  	}
  	ts := types.Transactions{signedTx}
  	rawTxBytes := ts.GetRlp(0)
- 	rawTxHex := hex.EncodeToString(rawTxBytes)
+ 	rawTxHex := Hexify(rawTxBytes)
  	// raw transaction is return
  	result := fmt.Sprintf("0x%s", rawTxHex)
  	return result, nil
 }
 
+// This function parses transaction and returns data field as
+// a result. It is neccessary, because messages are sent via tx
 func DecodeRawTx(rawTx string) ([]byte, error) {
 	var tx *types.Transaction
-	raw, err := hex.DecodeString(rawTx)
+	raw, err := Dehexify(rawTx)
 	if err != nil {
 		return []byte("can't parse raw tx"), err
 	}
