@@ -35,7 +35,16 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		rec := strings.Join(request["recepient"], "")
 		cb := c.GetCallbackLink(rec)
 		if cb == "" {
-			return `{"res": "nil", "error": "transaction didn't happen"}`, nil
+			r := ResponseJSON{"nil", "transaction didn't happen"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
 		msg := strings.Join(request["msg"], "")
 		emsg := c.CipherMessage(rec, msg)
