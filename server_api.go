@@ -14,13 +14,23 @@ type ResponseJSON struct {
 	Err string `json:"err"`
 }
 
+var DEFAULT_ERROR = `{"res": "nil", "error": "can't convert struct to JSON"}`
+
 var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, error) {
 	call := strings.Join(request["call"], "")
 	switch call {
 	case "id":
 		id := c.GetHSLink()
-		response := fmt.Sprintf(`{"res": "%s", "error": "nil"}`, id)
-		return response, nil
+		r := ResponseJSON{id, "nil"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	case "send":
 		rec := strings.Join(request["recepient"], "")
 		cb := c.GetCallbackLink(rec)

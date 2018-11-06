@@ -1,8 +1,6 @@
 package api
 
 import (
-	"bytes"
-	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -15,54 +13,7 @@ import (
 	random "math/rand"
 	"strconv"
 	"strings"
-
-	"github.com/pierrec/lz4"
 )
-
-func CompressSmallData(source string) []byte {
-	data := []byte(source)
-	buf := &bytes.Buffer{}
-	gw := gzip.NewWriter(buf)
-	gw.Write(data)
-	gw.Close()
-	return buf.Bytes()
-}
-
-func DecompressSmallData(source []byte) string {
-	var buf bytes.Buffer
-	gr, _ := gzip.NewReader(bytes.NewBuffer(source))
-	defer gr.Close()
-	source, _ = ioutil.ReadAll(gr)
-	buf.Write(source)
-	return buf.String()
-}
-
-func CompressBigData(ssource string) []byte {
-	source := []byte(ssource)
-	compressed := make([]byte, len(source))
-	_, err := lz4.CompressBlockHC(source, compressed, 0)
-	if err != nil {
-		return source
-	}
-	compressed, err = trimNullBytes(compressed)
-	if err != nil {
-		return source
-	}
-	return compressed
-}
-
-func DecompressBigData(source []byte) string {
-	decompressed := make([]byte, len(source) * 10)
-	_, err := lz4.UncompressBlock(source, decompressed)
-	if err != nil {
-		return string(source)
-	}
-	decompressedTrimmed, err := trimNullBytes(decompressed)
-	if err != nil {
-		return string(decompressed)
-	}
-	return string(decompressedTrimmed)
-}
 
 func GenRandomString(n int) string {
 	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -73,7 +24,7 @@ func GenRandomString(n int) string {
 	return string(b)
 }
 
-func appendByte(slice []byte, data ...byte) []byte {
+func AppendByte(slice []byte, data ...byte) []byte {
 	m := len(slice)
 	n := m + len(data)
 	if n > cap(slice) {
@@ -86,7 +37,7 @@ func appendByte(slice []byte, data ...byte) []byte {
 	return slice
 }
 
-func trimNullBytes(slice []byte) ([]byte, error) {
+func TrimNullBytes(slice []byte) ([]byte, error) {
 	l := len(slice)
 	l -= 1
 	for i := l; i >= 0; i-- {
@@ -97,7 +48,7 @@ func trimNullBytes(slice []byte) ([]byte, error) {
 	return slice, errors.New("Can't trim null bytes")
 }
 
-func stringifySlice(slice []byte) string {
+func StringifySlice(slice []byte) string {
 	result := strconv.Itoa(int(slice[0]))
 	for i := 1; i < len(slice); i++ {
 		result = fmt.Sprintf("%s %d", result, int(slice[i]))
@@ -105,12 +56,12 @@ func stringifySlice(slice []byte) string {
 	return result
 }
 
-func bytifyString(str string) []byte {
+func BytifyString(str string) []byte {
 	var result []byte
 	slice := strings.Split(str, " ")
 	for i := 0; i < len(slice); i++ {
 		numbered, _ := strconv.Atoi(slice[i])
-		result = appendByte(result, byte(numbered))
+		result = AppendByte(result, byte(numbered))
 	}
 	return result
 }
@@ -188,10 +139,10 @@ func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 }
 
 func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
-	strMsg := stringifySlice(msg)
+	strMsg := StringifySlice(msg)
 	split := strings.Split(strMsg, " 42 58 42 ")
-	num := bytifyString(split[0])
-	msg = bytifyString(split[1])
+	num := BytifyString(split[0])
+	msg = BytifyString(split[1])
 	realPath := c.ConstantPath + "/history/history"
 	// parsing our database to get correct cipher from there
 	constCipher, _ := parseCurrentCipher(realPath, receiver)
