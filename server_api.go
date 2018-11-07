@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -31,6 +30,32 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			}
 		}
 		return string(response), nil
+	case "chats":
+		chatsStr := ""
+		var response []byte
+		chats := c.GetChats()
+		if len(chats) <= 0 {
+			r := ResponseJSON{"nil", "no chats found"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
+		}
+		for c := range chats {
+			out, err := json.Marshal(chats[c])
+			if err != nil {
+				return fmt.Sprintf(`{"res": "nil", "error": "can't parse chat #%d"}`, c), nil
+			}
+			chatsStr = fmt.Sprintf("%s%s,", chatsStr, string(out))
+		}
+		chatsStr = chatsStr[:len(chatsStr) - 1]
+		response = []byte(fmt.Sprintf(`{"res": [%s], "error": "nil"}`, chatsStr))
+		return string(response), nil
 	case "send":
 		rec := strings.Join(request["recepient"], "")
 		cb := c.GetCallbackLink(rec)
@@ -50,49 +75,87 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		emsg := c.CipherMessage(rec, msg)
 		tx, err := FormRawTxWithBlockchain(emsg, rec)
 		if err != nil {
-			return `{"res": "nil", "error": "can't form transaction"}`, nil
+			r := ResponseJSON{"nil", "can't form transaction"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
 		link := c.GetHSLink()
-		if saved := c.SaveMessage(msg, rec); saved != false {
+		a := c.GetSelfAddress()
+		if saved := c.SaveMessage(msg, a); saved != false {
 			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 		} else {
-			return `{"res": "nil", "error": "can't save message"}`, nil
+			r := ResponseJSON{"nil", "can't save message"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
-		return fmt.Sprintf(`{"res": "%s", "error": "nil"}`, tx), nil
+		r := ResponseJSON{tx, "nil"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	case "inbox":
 		response := "nil"
 		addr := strings.Join(request["address"], "")
 		amount, err := strconv.Atoi(strings.Join(request["amount"], ""))
 		if err != nil {
-			return `{"res": "nil", "error": "can't convert amount to integer"}`, nil
+			return `{"res": [], "error": "can't convert amount to integer"}`, nil
 		}
 		offset, err := strconv.Atoi(strings.Join(request["offset"], ""))
 		if err != nil {
-			return `{"res": "nil", "error": "can't convert offset to integer"}`, nil
+			return `{"res": [], "error": "can't convert offset to integer"}`, nil
 		}
 		messages, err := c.GetMessages(addr, []int{amount, offset})
 		if err != nil {
-			return `{"res": "nil", "error": "can't get messages"}`, nil
+			return `{"res": [], "error": "can't get messages"}`, nil
 		}
 		if len(messages) != 0 {
 			response = ""
 			for m := range messages {
 				out, err := json.Marshal(messages[m])
 				if err != nil {
-					response = fmt.Sprintf(`{"res": "nil", "error": "can't parse message #%d"}`, m)
+					response = fmt.Sprintf(`{"res": [], "error": "can't parse message #%d"}`, m)
 					return response, nil
 				}
 				response = fmt.Sprintf("%s%s,", response, string(out))
 			}
 			response = response[:len(response) - 1]
-			response = fmt.Sprintf("[%s]", response)
 		}
-		return fmt.Sprintf(`{"res": "%s", "error": "nil"}`, response), nil
+		if response == "nil" {
+			return `{"res": [], "error": "nil"}`, nil
+		}
+		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
 	case "balanceOf":
 		addr := strings.Join(request["address"], "")
 		balance := GetBalance(addr)
-		response := fmt.Sprintf(`{"res": "%s", "error": "nil"}`, balance)
-		return response, nil
+		r := ResponseJSON{balance, "nil"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	case "notify":
 		cb := strings.Join(request["callback"], "")
 		addr := c.GetAddressByLink(cb)
@@ -100,14 +163,41 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		trimmedTx := strings.Split(tx, "x")[1]
 		decodedTx, err := DecodeRawTx(trimmedTx)
 		if err != nil {
-			return `{"res": "nil", "error": "can't decode tx"}`, err
+			r := ResponseJSON{"nil", "can't decode tx"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
 		if saved := c.SaveMessage(m, addr); saved != false {
-			return `{"res": "ok", "error": "nil"}`, nil
+			r := ResponseJSON{"ok", "nil"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
-		return `{"res": "nil", "error": "can't save message"}`, errors.New("Can't save message")
+		r := ResponseJSON{"nil", "can't save message"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	case "greeting":
 		cb := strings.Join(request["callback"], "")
 		cb = fmt.Sprintf("%s.onion", cb)
@@ -125,7 +215,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		formattedUrl = fmt.Sprintf("%s&cipher=%s", formattedUrl, hexedCipher)
 		response, err := Request(formattedUrl)
 		if err != nil {
-			return fmt.Sprintf(`{"res": "nil", "error": "%s"}`, err), err
+			return fmt.Sprintf(`{"res": "nil", "error": "%s"}`, err), nil
 		}
 		r := &ResponseJSON{}
 		err = json.Unmarshal([]byte(response), r)
@@ -144,12 +234,38 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		cipher := strings.Join(request["cipher"], "")
 		err := c.WriteDownNewUser(cb, addr, cipher)
 		if err != nil {
-			return `{"res": "nil", "error": "can't save user"}`, nil
+			r := ResponseJSON{"nil", "can't save user"}
+			response, err := json.Marshal(r)
+			if err != nil {
+				r = ResponseJSON{"nil", err.Error()}
+				response, err = json.Marshal(r)
+				if err != nil {
+					response = []byte(DEFAULT_ERROR)
+				}
+			}
+			return string(response), nil
 		}
-		r := fmt.Sprintf(`{"res": "%s", "error": "nil"}`, c.GetSelfAddress())
-		return r, nil
+		r := ResponseJSON{c.GetSelfAddress(), "nil"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	default:
-		return `{"res": "nil", "error": "unrecognized call"}`, nil
+		r := ResponseJSON{"nil", "unrecognized call"}
+		response, err := json.Marshal(r)
+		if err != nil {
+			r = ResponseJSON{"nil", err.Error()}
+			response, err = json.Marshal(r)
+			if err != nil {
+				response = []byte(DEFAULT_ERROR)
+			}
+		}
+		return string(response), nil
 	}
 }
 

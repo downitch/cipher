@@ -24,7 +24,7 @@ func GenRandomString(n int) string {
 	return string(b)
 }
 
-func AppendByte(slice []byte, data ...byte) []byte {
+func appendByte(slice []byte, data ...byte) []byte {
 	m := len(slice)
 	n := m + len(data)
 	if n > cap(slice) {
@@ -61,7 +61,7 @@ func BytifyString(str string) []byte {
 	slice := strings.Split(str, " ")
 	for i := 0; i < len(slice); i++ {
 		numbered, _ := strconv.Atoi(slice[i])
-		result = AppendByte(result, byte(numbered))
+		result = appendByte(result, byte(numbered))
 	}
 	return result
 }

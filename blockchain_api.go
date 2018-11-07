@@ -70,6 +70,11 @@ func GetLatestBlock() (string, error) {
 	return header.Number.String(), nil
 }
 
+// func GetLatestBlock() (string, error) {
+// 	resp, err := Request("api.blockcypher.com/v1/eth/main")
+
+// }
+
 // This function receives block number, casts it to bigInt and returns hash
 func GetBlockHash(number int64) (string, error) {
 	client, _ := runGeth()

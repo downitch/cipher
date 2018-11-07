@@ -11,9 +11,15 @@ import(
 )
 
 type Message struct {
-	Date int			`json:"date"`
-	Text string 	`json:"text"`
-	Author string `json:"author"`
+	Date 		int			`json:"date"`
+	Text 		string 	`json:"text"`
+	Author 	string 	`json:"author"`
+}
+
+type Chat struct {
+	Username 		string 	`json:"username"`
+	Address 		string 	`json:"address"`
+	LastMessage Message `json:"lastMessage"`
 }
 
 type NewMessage struct {
@@ -61,6 +67,35 @@ func (c *Commander) GetSelfAddress() string {
 	return formattedAddress
 }
 
+func (c *Commander) GetChats() []Chat {
+	var chats []Chat
+	path := c.ConstantPath
+	fullPath := path + "/history/history"
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return []Chat{}
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		split := strings.Split(txt, "*:*")
+		username := strings.Split(split[0], ".")[0]
+		address := split[1]
+		msgs, _ := c.GetMessages(address, []int{0,0})
+		lastMessage := Message{}
+		if msgs != nil {
+			lastMessage = msgs[len(msgs) - 1]
+		}
+		ch := Chat{username, address, lastMessage}
+		chats = append(chats, ch)
+	}
+	if err := scanner.Err(); err != nil {
+		return []Chat{}
+	}
+	return chats
+}
+
 func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	var messages []Message
 	var position int
@@ -73,7 +108,14 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if position >= pos[1] && (position - pos[1]) < pos[0] {
+		if pos[0] == pos[1] && pos[0] == 0 {
+			txt := scanner.Text()
+			split := strings.Split(txt, "*:*")
+			date, _ := strconv.Atoi(split[0])
+			author := split[1]
+			text := split[2]
+			messages = append(messages, Message{date, text, author})
+		} else if position >= pos[1] && (position - pos[1]) < pos[0] {
 			txt := scanner.Text()
 			split := strings.Split(txt, "*:*")
 			date, _ := strconv.Atoi(split[0])
@@ -85,6 +127,10 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 	}
 	if err := scanner.Err(); err != nil {
 		return []Message{}, err
+	}
+	for i := len(messages) / 2 - 1; i >= 0; i-- {
+		opp := len(messages) - 1 - i
+		messages[i], messages[opp] = messages[opp], messages[i]
 	}
 	return messages, nil
 }
