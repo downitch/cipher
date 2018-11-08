@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type ResponseJSON struct {
@@ -59,7 +57,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		return string(response), nil
 	case "send":
 		rec := strings.Join(request["recepient"], "")
-		cb := c.GetCallbackLink(rec)
+		cb := c.GetLinkByAddress(rec)
 		if cb == "" {
 			r := ResponseJSON{"nil", "transaction didn't happen"}
 			response, err := json.Marshal(r)
@@ -89,7 +87,8 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		if saved := c.SaveMessage(msg, rec, a); saved != false {
+		saved := c.SaveMessage(a, NewMessage{"text", "", "", rec, msg})
+		if saved == nil {
 			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 		} else {
 			r := ResponseJSON{"nil", "can't save message"}
@@ -116,15 +115,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 	case "inbox":
 		response := "nil"
 		addr := strings.Join(request["address"], "")
-		amount, err := strconv.Atoi(strings.Join(request["amount"], ""))
-		if err != nil {
-			return `{"res": [], "error": "can't convert amount to integer"}`, nil
-		}
-		offset, err := strconv.Atoi(strings.Join(request["offset"], ""))
-		if err != nil {
-			return `{"res": [], "error": "can't convert offset to integer"}`, nil
-		}
-		messages, err := c.GetMessages(addr, []int{amount, offset})
+		messages, err := c.GetChatHistory(addr)
 		if err != nil {
 			return `{"res": [], "error": "can't get messages"}`, nil
 		}
@@ -143,31 +134,16 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		if response == "nil" {
 			return `{"res": [], "error": "nil"}`, nil
 		}
-		l := c.GetCallbackLink(addr)
+		l := c.GetLinkByAddress(addr)
 		a := c.GetSelfAddress()
 		url := l + "/?call=inboxFired&address=" + a
-		// c.UpdateLocalMessageStatus(addr)
-		// go func() {
-		// 	i := 0
-		// 	r := "nil"
-		// 	for r != "ok" {
-		// 		if i > 15 {
-		// 			break
-		// 		}
-		// 		r, _ = Request(url)
-		// 		i = i + 1
-		// 		time.Sleep(time.Second * 2)
-		// 	}
-		// }()
-		Request(url)
+		go func() {
+			Request(url)
+		}()
 		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
 	case "inboxFired":
 		addr := strings.Join(request["address"], "")
-		done := false
-		done = c.UpdateMessageStatus(addr)
-		if done != true {
-			return `{"res": "nil", "error": "can't update message status"}`, nil
-		}
+		c.UpdateSentMessages(addr)
 		return `{"res": "ok", "error": "nil"}`, nil
 	case "balanceOf":
 		addr := strings.Join(request["address"], "")
@@ -202,7 +178,8 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
-		if saved := c.SaveMessage(m, addr, addr); saved != false {
+		saved := c.SaveMessage(addr, NewMessage{"text", "", "", addr, m})
+		if saved == nil {
 			r := ResponseJSON{"ok", "nil"}
 			response, err := json.Marshal(r)
 			if err != nil {
@@ -227,7 +204,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 	case "greeting":
 		cb := strings.Join(request["callback"], "")
 		cb = fmt.Sprintf("%s.onion", cb)
-		if existance := c.CheckExistance(cb); existance != nil {
+		if existance := c.CheckExistance(cb); existance != false {
 			return `{"res": "nil", "error": "already connected"}`, nil
 		}
 		cipher := GenRandomString(32)
@@ -248,7 +225,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		if err != nil {
 			return `{"res": "nil", "error": "can't parse response"}`, nil
 		}
-		err = c.WriteDownNewUser(cb, r.Res, hexedCipher)
+		err = c.AddNewUser(&NewUser{cb, r.Res, hexedCipher})
 		if err != nil {
 			return `{"res": "nil", "error": "can't save user"}`, nil
 		}
@@ -258,7 +235,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		cb := strings.Join(request["callback"], "")
 		cb = fmt.Sprintf("%s.onion", cb)
 		cipher := strings.Join(request["cipher"], "")
-		err := c.WriteDownNewUser(cb, addr, cipher)
+		err := c.AddNewUser(&NewUser{cb, addr, cipher})
 		if err != nil {
 			r := ResponseJSON{"nil", "can't save user"}
 			response, err := json.Marshal(r)
@@ -296,8 +273,6 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 }
 
 func (c *Commander) RunRealServer() {
-	c.updateFolderChtimes()
-	time.Sleep(time.Second * 2)
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
