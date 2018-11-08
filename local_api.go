@@ -1,59 +1,11 @@
 package api
 
 import(
-	"fmt"
-	"bufio"
 	"errors"
 	"os"
 	"io/ioutil"
-	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 )
-
-type NewMessage struct {
-	Type     string `json:"type"`
-	Date     int		`json:"date"`
-	Text     string `json:"text"`
-	Author   string `json:"author"`
-	Status   string `json:"status"`
-}
-
-type Chat struct {
-	Username 		string 		 `json:"username"`
-	Address 		string 		 `json:"address"`
-	LastMessage NewMessage `json:"lastMessage"`
-	NewMessages string 		 `json:"newMessages"`
-}
-
-func (c *Commander) GetCallbackLink(address string) string {
-	path := c.ConstantPath
-	data, _ := ioutil.ReadFile(path + "/history/history")
-	lines := strings.Split(string(data), "\n")
-	lines = lines[:len(lines)-1]
-	for line := range lines {
-		step := strings.Split(lines[line], "*:*")[1]
-		if address == step {
-			return strings.Split(lines[line], "*:*")[0]
-		}
-	}
-	return ""
-}
-
-func (c *Commander) GetAddressByLink(link string) string {
-	path := c.ConstantPath
-	data, _ := ioutil.ReadFile(path + "/history/history")
-	lines := strings.Split(string(data), "\n")
-	lines = lines[:len(lines)-1]
-	for line := range lines {
-		step := strings.Split(lines[line], "*:*")[0]
-		if link == step {
-			return strings.Split(lines[line], "*:*")[1]
-		}
-	}
-	return ""
-}
 
 func (c *Commander) GetSelfAddress() string {
 	path := c.ConstantPath
@@ -63,6 +15,7 @@ func (c *Commander) GetSelfAddress() string {
 	return formattedAddress
 }
 
+<<<<<<< HEAD
 func (c *Commander) GetChats() []Chat {
 	var chats []Chat
 	path := c.ConstantPath
@@ -137,6 +90,8 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]NewMessage, error) {
 	return messages, nil
 }
 
+=======
+>>>>>>> database
 func (c *Commander) UpdateCurrentAddress(address string) error {
 	path := c.ConstantPath
 	fullPath := path + "/hs/address"
@@ -155,6 +110,7 @@ func (c *Commander) UpdateCurrentAddress(address string) error {
 		return errors.New("can't add string to file")
 	}
 	return nil
+<<<<<<< HEAD
 }
 
 func (c *Commander) CheckExistance(link string) error {
@@ -325,4 +281,6 @@ func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) e
 		return errors.New("can't add string to file")
 	}
 	return nil
+=======
+>>>>>>> database
 }
