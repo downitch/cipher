@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ResponseJSON struct {
@@ -15,7 +16,7 @@ type ResponseJSON struct {
 
 var DEFAULT_ERROR = `{"res": "nil", "error": "can't convert struct to JSON"}`
 
-var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, error) {
+var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) (string, error) {
 	call := strings.Join(request["call"], "")
 	switch call {
 	case "id":
@@ -88,7 +89,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		if saved := c.SaveMessage(msg, a); saved != false {
+		if saved := c.SaveMessage(msg, rec, a); saved != false {
 			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 		} else {
 			r := ResponseJSON{"nil", "can't save message"}
@@ -142,7 +143,32 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		if response == "nil" {
 			return `{"res": [], "error": "nil"}`, nil
 		}
+		l := c.GetCallbackLink(addr)
+		a := c.GetSelfAddress()
+		url := l + "/?call=inboxFired&address=" + a
+		// c.UpdateLocalMessageStatus(addr)
+		// go func() {
+		// 	i := 0
+		// 	r := "nil"
+		// 	for r != "ok" {
+		// 		if i > 15 {
+		// 			break
+		// 		}
+		// 		r, _ = Request(url)
+		// 		i = i + 1
+		// 		time.Sleep(time.Second * 2)
+		// 	}
+		// }()
+		Request(url)
 		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
+	case "inboxFired":
+		addr := strings.Join(request["address"], "")
+		done := false
+		done = c.UpdateMessageStatus(addr)
+		if done != true {
+			return `{"res": "nil", "error": "can't update message status"}`, nil
+		}
+		return `{"res": "ok", "error": "nil"}`, nil
 	case "balanceOf":
 		addr := strings.Join(request["address"], "")
 		balance := GetBalance(addr)
@@ -176,7 +202,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
-		if saved := c.SaveMessage(m, addr); saved != false {
+		if saved := c.SaveMessage(m, addr, addr); saved != false {
 			r := ResponseJSON{"ok", "nil"}
 			response, err := json.Marshal(r)
 			if err != nil {
@@ -270,10 +296,12 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 }
 
 func (c *Commander) RunRealServer() {
+	c.updateFolderChtimes()
+	time.Sleep(time.Second * 2)
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response, _ := DEFAULT_HANDLER(r.URL.Query(), c)
+			response, _ := DEFAULT_HANDLER(r.URL.Query(), c, 0)
 			// sending back the response as web-server answer
 			w.Write([]byte(response))
 		})}

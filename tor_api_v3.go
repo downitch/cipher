@@ -78,7 +78,11 @@ func (c *Commander) RunTorAndHS() {
 	case "windows":
 		return
 	default:
-		command := "cd "+c.ConstantPath+" && ./tor -f "+c.ConstantPath+"/torrc --verbose"
-		exec.Command("sh", "-c", command).Output()
+		command := "cd "+c.ConstantPath+" && ./tor --hush -f "+c.ConstantPath+"/torrc"
+		out, err := exec.Command("sh", "-c", command).Output()
+		if err != nil {
+			fmt.Printf(err.Error())
+		}
+		fmt.Printf("%s\n", out)
 	}
 }

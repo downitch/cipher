@@ -1,34 +1,30 @@
 package api
 
 import(
+	"fmt"
 	"bufio"
 	"errors"
 	"os"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
-
-type Message struct {
-	Date 		int			`json:"date"`
-	Text 		string 	`json:"text"`
-	Author 	string 	`json:"author"`
-}
-
-type Chat struct {
-	Username 		string 	`json:"username"`
-	Address 		string 	`json:"address"`
-	LastMessage Message `json:"lastMessage"`
-}
 
 type NewMessage struct {
 	Type     string `json:"type"`
 	Date     int		`json:"date"`
 	Text     string `json:"text"`
 	Author   string `json:"author"`
-	Sent     bool   `json:"sent"`
-	Received bool   `json:"received"`
+	Status   string `json:"status"`
+}
+
+type Chat struct {
+	Username 		string 		 `json:"username"`
+	Address 		string 		 `json:"address"`
+	LastMessage NewMessage `json:"lastMessage"`
+	NewMessages string 		 `json:"newMessages"`
 }
 
 func (c *Commander) GetCallbackLink(address string) string {
@@ -83,11 +79,12 @@ func (c *Commander) GetChats() []Chat {
 		username := strings.Split(split[0], ".")[0]
 		address := split[1]
 		msgs, _ := c.GetMessages(address, []int{0,0})
-		lastMessage := Message{}
-		if msgs != nil {
-			lastMessage = msgs[len(msgs) - 1]
+		lastMessage := NewMessage{}
+		if len(msgs) > 0 {
+			lastMessage = msgs[0]
 		}
-		ch := Chat{username, address, lastMessage}
+		nm := c.GetSelfStatusMessages(address)
+		ch := Chat{username, address, lastMessage, nm}
 		chats = append(chats, ch)
 	}
 	if err := scanner.Err(); err != nil {
@@ -96,14 +93,14 @@ func (c *Commander) GetChats() []Chat {
 	return chats
 }
 
-func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
-	var messages []Message
+func (c *Commander) GetMessages(addr string, pos []int) ([]NewMessage, error) {
+	var messages []NewMessage
 	var position int
 	path := c.ConstantPath
 	fullPath := path + "/history/" + addr
 	file, err := os.Open(fullPath)
 	if err != nil {
-	  return []Message{}, err
+	  return []NewMessage{}, err
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
@@ -111,22 +108,26 @@ func (c *Commander) GetMessages(addr string, pos []int) ([]Message, error) {
 		if pos[0] == pos[1] && pos[0] == 0 {
 			txt := scanner.Text()
 			split := strings.Split(txt, "*:*")
-			date, _ := strconv.Atoi(split[0])
-			author := split[1]
-			text := split[2]
-			messages = append(messages, Message{date, text, author})
+			t := split[0]
+			date, _ := strconv.Atoi(split[1])
+			author := split[2]
+			status := split[3]
+			text := split[4]
+			messages = append(messages, NewMessage{t, date, text, author, status})
 		} else if position >= pos[1] && (position - pos[1]) < pos[0] {
 			txt := scanner.Text()
 			split := strings.Split(txt, "*:*")
-			date, _ := strconv.Atoi(split[0])
-			author := split[1]
-			text := split[2]
-			messages = append(messages, Message{date, text, author})
+			t := split[0]
+			date, _ := strconv.Atoi(split[1])
+			author := split[2]
+			status := split[3]
+			text := split[4]
+			messages = append(messages, NewMessage{t, date, text, author, status})
 		}
 		position = position + 1
 	}
 	if err := scanner.Err(); err != nil {
-		return []Message{}, err
+		return []NewMessage{}, err
 	}
 	for i := len(messages) / 2 - 1; i >= 0; i-- {
 		opp := len(messages) - 1 - i
@@ -169,19 +170,137 @@ func (c *Commander) CheckExistance(link string) error {
 	return nil
 }
 
-func (c *Commander) SaveMessage(message string, address string) bool {
+func (c *Commander) SaveMessage(message string, address string, author string) bool {
 	path := c.ConstantPath
 	fullPath := path + "/history/" + address
 	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
+		fmt.Println(err)
 		return false
 	}
 	defer f.Close()
+	defer func() {
+		fmt.Println("back to 888")
+		os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
+	}()
+	os.Chtimes(fullPath, time.Unix(999, 0), time.Unix(999, 0))
 	currentTime := strconv.Itoa(int(time.Now().UnixNano() / 1000000))
-	text := currentTime + "*:*" + address + "*:*" + message + "\n"
+	text := "text*:*" + currentTime + "*:*" + author + "*:*self*:*" + message + "\n"
+	if c.GetSelfAddress() == author {
+		text = "text*:*" + currentTime + "*:*" + author + "*:*sent*:*" + message + "\n"
+	}
 	if _, err = f.WriteString(text); err != nil {
+		fmt.Println(err)
+		// f.Close()
+		// os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
 		return false
 	}
+	// f.Close()
+	// os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
+	return true
+}
+
+func (c *Commander) GetSelfStatusMessages(address string) string {
+	amount := 0
+	path := c.ConstantPath
+	fullPath := path + "/history/" + address
+	input, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		return strconv.Itoa(amount)
+	}
+	lines := strings.Split(string(input), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "*:*self*:*") {
+			amount = amount + 1
+		}
+	}
+	return strconv.Itoa(amount)
+}
+
+func (c *Commander) updateFolderChtimes() bool {
+	var files []string
+	root := c.ConstantPath + "/history"
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return false
+	}
+	for _, file := range files {
+		splt := strings.Split(file, "/")
+		if splt[len(splt) - 1][:2] == "0x" {
+			os.Chtimes(file, time.Unix(888, 0), time.Unix(888, 0))
+			f, _ := os.Stat(file)
+			fmt.Println(f.ModTime().UnixNano() / 1000000000)
+		}
+	}
+	return true
+}
+
+func (c *Commander) UpdateLocalMessageStatus(address string) bool {
+	path := c.ConstantPath
+	fullPath := path + "/history/" + address
+	f, _ := os.Stat(fullPath)
+	modificationTime := f.ModTime()
+	tUnix := modificationTime.UnixNano() / 1000000000
+	if tUnix != 888 {
+		fmt.Println("LOCAL FILE BUSY")
+		return false
+	}
+	os.Chtimes(fullPath, time.Unix(999, 0), time.Unix(999, 0))
+	input, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(string(input), "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "*:*self*:*") {
+			split := strings.Split(line, "*:*")
+			split[3] = "down"
+			l := strings.Join(split[:], "*:*")
+			lines[i] = l
+		}
+	}
+	output := strings.Join(lines, "\n")
+	err = ioutil.WriteFile(fullPath, []byte(output), 0666)
+	if err != nil {
+		return false
+	}
+	os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
+	return true
+}
+
+func (c *Commander) UpdateMessageStatus(address string) bool {
+	path := c.ConstantPath
+	fullPath := path + "/history/" + address
+	f, _ := os.Stat(fullPath)
+	modificationTime := f.ModTime()
+	tUnix := modificationTime.UnixNano() / 1000000000
+	if tUnix != 888 {
+		fmt.Println("REMOTE FILE BUSY")
+		return false
+	}
+	os.Chtimes(fullPath, time.Unix(999, 0), time.Unix(999, 0))
+	input, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(string(input), "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "*:*sent*:*") {
+			split := strings.Split(line, "*:*")
+			split[3] = "read"
+			l := strings.Join(split[:], "*:*")
+			lines[i] = l
+		}
+	}
+	output := strings.Join(lines, "\n")
+	err = ioutil.WriteFile(fullPath, []byte(output), 0666)
+	if err != nil {
+		return false
+	}
+	os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
 	return true
 }
 
