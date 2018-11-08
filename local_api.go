@@ -79,6 +79,7 @@ func (c *Commander) GetChats() []Chat {
 		username := strings.Split(split[0], ".")[0]
 		address := split[1]
 		msgs, _ := c.GetMessages(address, []int{0,0})
+		ppath := c.ConstantPath + "/" + address
 		lastMessage := NewMessage{}
 		if len(msgs) > 0 {
 			lastMessage = msgs[0]
@@ -312,6 +313,7 @@ func (c *Commander) WriteDownNewUser(cb string, address string, cipher string) e
 		return errors.New("can't create history file")
 	}
 	f.Close()
+	os.Chtimes(fullPath, time.Unix(888, 0), time.Unix(888, 0))
 	fullPath = path + "/history/history"
 	f, err = os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {

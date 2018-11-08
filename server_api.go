@@ -146,20 +146,9 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		l := c.GetCallbackLink(addr)
 		a := c.GetSelfAddress()
 		url := l + "/?call=inboxFired&address=" + a
-		// c.UpdateLocalMessageStatus(addr)
-		// go func() {
-		// 	i := 0
-		// 	r := "nil"
-		// 	for r != "ok" {
-		// 		if i > 15 {
-		// 			break
-		// 		}
-		// 		r, _ = Request(url)
-		// 		i = i + 1
-		// 		time.Sleep(time.Second * 2)
-		// 	}
-		// }()
-		Request(url)
+		go func() {
+			Request(url)
+		}()
 		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
 	case "inboxFired":
 		addr := strings.Join(request["address"], "")
