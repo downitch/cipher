@@ -5,6 +5,7 @@ import(
 	"database/sql"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -32,20 +33,27 @@ type User struct {
 }
 
 func (c *Commander) UpdateStorage() bool {
+	// path := c.ConstantPath + "/history/"
+	// if _, err := os.Stat(); os.IsNotExist(err) {
+
+	// }
 	db, err := c.openDB("history")
 	if err != nil {
 		return false
 	}
-	defer closeDB(db)
 	stmnt := `create table if not exists knownUsers(
+	id integer not null primary key,
 	username text,
 	link text,
 	address text,
 	hash text);`
 	_, err = db.Exec(stmnt)
 	if err != nil {
+		fmt.Println(err)
+		closeDB(db)
 		return false
 	}
+	closeDB(db)
 	return true
 }
 
@@ -71,20 +79,13 @@ func (c *Commander) GetLinkByAddress(address string) string {
 		return ""
 	}
 	defer closeDB(db)
-	stmnt := fmt.Sprintf(
-		`select link from knownUsers where address = %s`, address)
-	rows, err := db.Query(stmnt)
+	stmnt := "select link from knownUsers where address = ?"
+	st, err := db.Prepare(stmnt)
 	if err != nil {
 		return ""
 	}
-	defer rows.Close()
-	for rows.Next() {
-		err = rows.Scan(&link)
-		if err != nil {
-			return ""
-		}
-	}
-	err = rows.Err()
+	defer st.Close()
+	err = st.QueryRow(address).Scan(&link)
 	if err != nil {
 		return ""
 	}
@@ -98,61 +99,74 @@ func (c *Commander) GetAddressByLink(link string) string {
 		return ""
 	}
 	defer closeDB(db)
-	stmnt := fmt.Sprintf(`select address from knownUsers where link = %s`, link)
-	rows, err := db.Query(stmnt)
+	stmnt := "select address from knownUsers where link = ?"
+	st, err := db.Prepare(stmnt)
 	if err != nil {
 		return ""
 	}
-	defer rows.Close()
-	for rows.Next() {
-		err = rows.Scan(&address)
-		if err != nil {
-			return ""
-		}
-	}
-	err = rows.Err()
+	defer st.Close()
+	err = st.QueryRow(link).Scan(&address)
 	if err != nil {
 		return ""
 	}
 	return address
 }
 
-func (c *Commander) CheckExistance(link string) bool {
-	amount := 0
+func (c *Commander) GetCipherByAddress(address string) string {
+	var cipher string
 	db, err := c.openDB("history")
 	if err != nil {
+		return ""
+	}
+	defer closeDB(db)
+	stmnt := "select hash from knownUsers where address = ?"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		return ""
+	}
+	defer st.Close()
+	err = st.QueryRow(address).Scan(&cipher)
+	if err != nil {
+		return ""
+	}
+	return cipher
+}
+
+func (c *Commander) CheckExistance(link string) bool {
+	db, err := c.openDB("history")
+	if err != nil {
+		fmt.Println("cant open db")
 		return true
 	}
 	defer closeDB(db)
-	stmnt := fmt.Sprintf(`select id from knownUsers where link = %s`, link)
-	rows, err := db.Query(stmnt)
+	stmnt := "select address from knownUsers where link = ?"
+	st, err := db.Prepare(stmnt)
 	if err != nil {
+		fmt.Println(err)
 		return true
 	}
-	defer rows.Close()
-	for rows.Next() {
-		amount = amount + 1
-	}
-	err = rows.Err()
+	defer st.Close()
+	address := ""
+	err = st.QueryRow(link).Scan(&address)
 	if err != nil {
-		return true
+		return false
 	}
-	if amount > 0 {
-		return true
-	}
-	return false
+	return true
 }
 
 func (c *Commander) GetChats() []User {
 	var users []User
 	db, err := c.openDB("history")
 	if err != nil {
+		fmt.Println(err)
 		return []User{}
 	}
 	defer closeDB(db)
 	stmnt := `select username, link, address from knownUsers;`
 	rows, err := db.Query(stmnt)
 	if err != nil {
+		fmt.Println("Error on query from knownUsers")
+		fmt.Println(err)
 		return []User{}
 	}
 	defer rows.Close()
@@ -162,14 +176,20 @@ func (c *Commander) GetChats() []User {
 		var address string
 		err = rows.Scan(&username, &link, &address)
 		if err != nil {
+			fmt.Println("error on Scanning row")
+			fmt.Println(err)
 			return []User{}
 		}
 		lastMsg, err := c.GetLastMessage(address)
 		if err != nil {
+			fmt.Println("error getting last message")
+			fmt.Println(err)
 			return []User{}
 		}
 		newMsgs, err := c.GetNewMessages(address)
 		if err != nil {
+			fmt.Println("error getting amount of self messages")
+			fmt.Println(err)
 			return []User{}
 		}
 		newMsgsStringified := strconv.Itoa(newMsgs)
@@ -183,6 +203,8 @@ func (c *Commander) GetChats() []User {
 	}
 	err = rows.Err()
 	if err != nil {
+		fmt.Println("error at checking rows error")
+		fmt.Println(err)
 		return []User{}
 	}
 	return users
@@ -232,27 +254,22 @@ func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
 	status,
 	sender,
 	input from messages where id = (select max(id) from messages);`
-	rows, err := db.Query(stmnt)
+	st, err := db.Prepare(stmnt)
 	if err != nil {
-		return NewMessage{}, err
+		return NewMessage{}, nil
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var origin string
-		var date string
-		var status string
-		var sender string
-		var input string
-		err = rows.Scan(&origin, &date, &status, &sender, &input)
-		if err != nil {
-			return NewMessage{}, err
-		}
-		msg = NewMessage{origin, date, status, sender, input}
-	}
-	err = rows.Err()
+	defer st.Close()
+	var origin string
+	var date string
+	var status string
+	var sender string
+	var input string
+	err = st.QueryRow().Scan(&origin, &date, &status, &sender, &input)
 	if err != nil {
-		return NewMessage{}, err
+		return NewMessage{}, nil
 	}
+	msg = NewMessage{origin, date, status, sender, input}
+	fmt.Println(msg)
 	return msg, nil
 }
 
@@ -263,17 +280,21 @@ func (c *Commander) GetNewMessages(addr string) (int, error) {
 		return 0, err
 	}
 	defer closeDB(db)
-	stmnt := `select id from messages where status = self;`
-	rows, err := db.Query(stmnt)
+	stmnt := `select id from messages where status = ?;`
+	rows, err := db.Query(stmnt, "self")
 	if err != nil {
+		fmt.Println(err)
 		return 0, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		amount = amount + 1
+		fmt.Println(amount)
 	}
 	err = rows.Err()
 	if err != nil {
+		fmt.Println("KEK")
+		fmt.Println(err)
 		return 0, err
 	}
 	return amount, nil
@@ -285,9 +306,10 @@ func (c *Commander) UpdateSelfMessages(address string) {
 		return
 	}
 	defer closeDB(db)
-	stmnt := `update messages set status=down where status=self;`
-	_, err = db.Exec(stmnt)
+	stmnt := `update messages set status = ? where status = ?;`
+	_, err = db.Exec(stmnt, "down", "self")
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	return
@@ -299,9 +321,10 @@ func (c *Commander) UpdateSentMessages(address string) {
 		return
 	}
 	defer closeDB(db)
-	stmnt := `update messages set status=read where status=sent;`
-	_, err = db.Exec(stmnt)
+	stmnt := `update messages set status = ? where status = ?;`
+	_, err = db.Exec(stmnt, "read", "sent")
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	return
@@ -347,15 +370,52 @@ func (c *Commander) AddNewUser(u *NewUser) error {
 	return nil
 }
 
-func (c *Commander) SaveMessage(addr string, msg NewMessage) error {
-	db, err := c.openDB(addr)
+func (c *Commander) SetUsername(link string, username string) bool {
+	db, err := c.openDB("history")
+	if err != nil {
+		return false
+	}
+	defer closeDB(db)
+	stmnt := "update knownUsers set username = ? where link = ?"
+	_, err = db.Exec(stmnt, username, link)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func (c *Commander) DeleteContact(link string) bool {
+	db, err := c.openDB("history")
+	if err != nil {
+		return false
+	}
+	defer closeDB(db)
+	address := c.GetAddressByLink(link)
+	stmnt := fmt.Sprintf(`delete from knownUsers where link = '%s'`, link)
+	_, err = db.Exec(stmnt)
+	if err != nil {
+		return false
+	}
+	path := c.ConstantPath
+	fullPath := fmt.Sprintf("%s/history/%s.db", path, address)
+	os.Remove(fullPath)
+	return true
+}
+
+func (c *Commander) SaveMessage(addr string, rec string, msg string) error {
+	status := "sent"
+	db, err := c.openDB(rec)
 	if err != nil {
 		return err
 	}
 	defer closeDB(db)
+	if addr == rec {
+		status = "self"
+	}
+	date := strconv.Itoa(int(time.Now().Unix()))
 	stmnt := fmt.Sprintf(
 		`insert into messages(
-		type,
+		origin,
 		date,
 		status,
 		sender,
@@ -364,9 +424,11 @@ func (c *Commander) SaveMessage(addr string, msg NewMessage) error {
 		'%s',
 		'%s',
 		'%s',
-		'%s');`, msg.Type, msg.Date, msg.Status, msg.Sender, msg.Text)
+		'%s');`, "text", date, status, addr, msg)
 	_, err = db.Exec(stmnt)
 	if err != nil {
+		fmt.Println("Statement broken")
+		fmt.Println(err)
 		return err
 	}
 	return nil

@@ -59,6 +59,8 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		rec := strings.Join(request["recepient"], "")
 		cb := c.GetLinkByAddress(rec)
 		if cb == "" {
+			fmt.Println("EMPTY CALLBACK")
+			fmt.Println(cb)
 			r := ResponseJSON{"nil", "transaction didn't happen"}
 			response, err := json.Marshal(r)
 			if err != nil {
@@ -87,7 +89,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		saved := c.SaveMessage(a, NewMessage{"text", "", "", rec, msg})
+		saved := c.SaveMessage(a, rec, msg)
 		if saved == nil {
 			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 		} else {
@@ -135,10 +137,15 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			return `{"res": [], "error": "nil"}`, nil
 		}
 		l := c.GetLinkByAddress(addr)
+		fmt.Println(l)
 		a := c.GetSelfAddress()
+		fmt.Println(a)
 		url := l + "/?call=inboxFired&address=" + a
+		fmt.Println(url)
 		go func() {
+			fmt.Println("REQUESTING")
 			Request(url)
+			fmt.Println("DONE")
 		}()
 		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
 	case "inboxFired":
@@ -178,7 +185,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
-		saved := c.SaveMessage(addr, NewMessage{"text", "", "", addr, m})
+		saved := c.SaveMessage(addr, addr, m)
 		if saved == nil {
 			r := ResponseJSON{"ok", "nil"}
 			response, err := json.Marshal(r)

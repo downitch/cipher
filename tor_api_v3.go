@@ -7,18 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 
 	"golang.org/x/net/proxy"
 )
-
-func (c *Commander) GetHSLink() string {
-	path := c.ConstantPath
-	pathToHostname := path + "/hs/hostname"
-	data, _ := ioutil.ReadFile(pathToHostname)
-	link := strings.Split(string(data), "\n")[0]
-	return link
-}
 
 // This function should be fired everytime Tor Hidden Service is running
 func (c *Commander) ConfigureTorrc() error {

@@ -7,6 +7,14 @@ import(
 	"strings"
 )
 
+func (c *Commander) GetHSLink() string {
+	path := c.ConstantPath
+	pathToHostname := path + "/hs/hostname"
+	data, _ := ioutil.ReadFile(pathToHostname)
+	link := strings.Split(string(data), "\n")[0]
+	return link
+}
+
 func (c *Commander) GetSelfAddress() string {
 	path := c.ConstantPath
 	data, _ := ioutil.ReadFile(path + "/hs/address")
