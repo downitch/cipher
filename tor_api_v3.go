@@ -82,11 +82,13 @@ func RequestWithTimeout(url string) (string, error) {
 		req, err := http.NewRequest("GET", "http://" + url, nil)
 		if err != nil {
 			timeout <- "fail"
+			return
 		}
 		// receiving response
 		resp, err = httpClient.Do(req)
 		if err != nil {
 			timeout <- "fail"
+			return
 		}
 		timeout <- "done"
 	}()

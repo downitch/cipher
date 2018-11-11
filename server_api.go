@@ -129,20 +129,11 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 	case "inboxFired":
 		addr := strings.Join(request["address"], "")
 		c.UpdateSentMessages(addr)
-		return `{"res": "ok", "error": "nil"}`, nil
+		return formResponse("ok", ""), nil
 	case "balanceOf":
 		addr := strings.Join(request["address"], "")
 		balance := GetBalance(addr)
-		r := ResponseJSON{balance, "nil"}
-		response, err := json.Marshal(r)
-		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
-			}
-		}
-		return string(response), nil
+		return formResponse(balance, ""), nil
 	case "notify":
 		cb := strings.Join(request["callback"], "")
 		addr := c.GetAddressByLink(cb)
@@ -150,42 +141,15 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		trimmedTx := strings.Split(tx, "x")[1]
 		decodedTx, err := DecodeRawTx(trimmedTx)
 		if err != nil {
-			r := ResponseJSON{"nil", "can't decode tx"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+			return formResponse("", "can't decode tx"), nil
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
 		saved := c.SaveMessage(addr, addr, m)
 		if saved > 0 {
-			r := ResponseJSON{"ok", "nil"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+			return formResponse("ok", ""), nil
 		}
-		r := ResponseJSON{"nil", "can't save message"}
-		response, err := json.Marshal(r)
-		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
-			}
-		}
-		return string(response), nil
+		return formResponse("", "can't save message"), nil
 	case "greeting":
 		cb := strings.Join(request["callback"], "")
 		cb = fmt.Sprintf("%s.onion", cb)
