@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"strconv"
 )
 
 type ResponseJSON struct {
@@ -19,36 +20,19 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 	switch call {
 	case "id":
 		id := c.GetHSLink()
-		r := ResponseJSON{id, "nil"}
-		response, err := json.Marshal(r)
-		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
-			}
-		}
-		return string(response), nil
+		return formResponse(id, ""), nil
 	case "chats":
 		chatsStr := ""
 		var response []byte
 		chats := c.GetChats()
 		if len(chats) <= 0 {
-			r := ResponseJSON{"nil", "no chats found"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+			return formResponse("", "no chats found"), nil
 		}
 		for c := range chats {
 			out, err := json.Marshal(chats[c])
 			if err != nil {
-				return fmt.Sprintf(`{"res": "nil", "error": "can't parse chat #%d"}`, c), nil
+				errResponse := fmt.Sprintf("can't parse chat #%d", c)
+				return formResponse("", errResponse), nil
 			}
 			chatsStr = fmt.Sprintf("%s%s,", chatsStr, string(out))
 		}
@@ -59,61 +43,60 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		rec := strings.Join(request["recepient"], "")
 		cb := c.GetLinkByAddress(rec)
 		if cb == "" {
-			fmt.Println("EMPTY CALLBACK")
-			fmt.Println(cb)
-			r := ResponseJSON{"nil", "transaction didn't happen"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+			return formResponse("", "transaction didn't happen"), nil
 		}
 		msg := strings.Join(request["msg"], "")
 		emsg := c.CipherMessage(rec, msg)
 		tx, err := FormRawTxWithBlockchain(emsg, rec)
 		if err != nil {
-			r := ResponseJSON{"nil", "can't form transaction"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+			return formResponse("", "can't form transaction"), nil
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		saved := c.SaveMessage(a, rec, msg)
-		if saved == nil {
-			Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
-		} else {
-			r := ResponseJSON{"nil", "can't save message"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+		id := c.SaveMessage(a, rec, msg)
+		if id == 0 {
+			return formResponse("", "can't save message"), nil
 		}
-		r := ResponseJSON{tx, "nil"}
-		response, err := json.Marshal(r)
+		go func() {
+			r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			if err != nil {
+				c.UpdateFailedMessage(id, rec)
+			}
+			res := &ResponseJSON{}
+			err = json.Unmarshal([]byte(r), res)
+			if err != nil || res.Res != "ok" {
+				c.UpdateFailedMessage(id, rec)
+			}
+		}()
+		return formResponse(tx, ""), nil
+	case "resend":
+		addr := strings.Join(request["address"], "")
+		iid := strings.Join(request["id"], "")
+		id, _ := strconv.Atoi(iid)
+		msg := c.GetMessageById(addr, id)
+		emsg := c.CipherMessage(addr, msg.Text)
+		tx, err := FormRawTxWithBlockchain(emsg, addr)
 		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
-			}
+			return formResponse("", "can't form transaction"), nil
 		}
-		return string(response), nil
+		cb := c.GetLinkByAddress(addr)
+		if cb == "" {
+			return formResponse("", "transaction didn't happen"), nil
+		}
+		link := c.GetHSLink()
+		r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+		if err != nil {
+			c.UpdateFailedMessage(id, addr)
+			return formResponse("", "user is offline"), nil
+		}
+		res := &ResponseJSON{}
+		err = json.Unmarshal([]byte(r), res)
+		if err != nil || res.Res != "ok" {
+			c.UpdateFailedMessage(id, addr)
+			return formResponse("", "recepient can't save message"), nil
+		}
+		c.UpdateUnfailMessage(id, addr)
+		return formResponse(tx, ""), nil
 	case "inbox":
 		response := "nil"
 		addr := strings.Join(request["address"], "")
@@ -126,7 +109,8 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			for m := range messages {
 				out, err := json.Marshal(messages[m])
 				if err != nil {
-					response = fmt.Sprintf(`{"res": [], "error": "can't parse message #%d"}`, m)
+					response = fmt.Sprintf(`{"res": [],
+						"error": "can't parse message #%d"}`, m)
 					return response, nil
 				}
 				response = fmt.Sprintf("%s%s,", response, string(out))
@@ -136,16 +120,10 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		if response == "nil" {
 			return `{"res": [], "error": "nil"}`, nil
 		}
-		l := c.GetLinkByAddress(addr)
-		fmt.Println(l)
-		a := c.GetSelfAddress()
-		fmt.Println(a)
-		url := l + "/?call=inboxFired&address=" + a
-		fmt.Println(url)
 		go func() {
-			fmt.Println("REQUESTING")
-			Request(url)
-			fmt.Println("DONE")
+			l := c.GetLinkByAddress(addr)
+			a := c.GetSelfAddress()
+			RequestWithTimeout(fmt.Sprintf("%s/?call=inboxFired&address=%s", l, a))
 		}()
 		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
 	case "inboxFired":
@@ -186,7 +164,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
 		saved := c.SaveMessage(addr, addr, m)
-		if saved == nil {
+		if saved > 0 {
 			r := ResponseJSON{"ok", "nil"}
 			response, err := json.Marshal(r)
 			if err != nil {
@@ -212,71 +190,62 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		cb := strings.Join(request["callback"], "")
 		cb = fmt.Sprintf("%s.onion", cb)
 		if existance := c.CheckExistance(cb); existance != false {
-			return `{"res": "nil", "error": "already connected"}`, nil
+			return formResponse("", "already connected"), nil
 		}
 		cipher := GenRandomString(32)
 		hexedCipher := Hexify(cipher)
-		link := c.GetHSLink()
-		link = strings.Split(link, ".")[0]
+		link := strings.Split(c.GetHSLink(), ".")[0]
 		selfAddr := c.GetSelfAddress()
-		formattedUrl := fmt.Sprintf("%s/?call=greetingOk", cb)
-		formattedUrl = fmt.Sprintf("%s&callback=%s", formattedUrl, link)
-		formattedUrl = fmt.Sprintf("%s&address=%s", formattedUrl, selfAddr)
-		formattedUrl = fmt.Sprintf("%s&cipher=%s", formattedUrl, hexedCipher)
-		response, err := Request(formattedUrl)
+		formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=%s&address=%s
+			&cipher=%s`, cb, link, selfAddr, hexedCipher)
+		response, err := RequestWithTimeout(formattedUrl)
 		if err != nil {
-			return fmt.Sprintf(`{"res": "nil", "error": "%s"}`, err), nil
+			return formResponse("", err.Error()), nil
 		}
 		r := &ResponseJSON{}
-		err = json.Unmarshal([]byte(response), r)
-		if err != nil {
-			return `{"res": "nil", "error": "can't parse response"}`, nil
+		if err = json.Unmarshal([]byte(response), r); err != nil {
+			return formResponse("", "can't parse response"), nil
 		}
-		err = c.AddNewUser(&NewUser{cb, r.Res, hexedCipher})
-		if err != nil {
-			return `{"res": "nil", "error": "can't save user"}`, nil
+		if err = c.AddNewUser(&NewUser{cb, r.Res, hexedCipher}); err != nil {
+			return formResponse("", "can't save user"), nil
 		}
-		return `{"res": "ok", "error": "nil"}`, nil
+		return formResponse("ok", ""), nil
 	case "greetingOk":
 		addr := strings.Join(request["address"], "")
-		cb := strings.Join(request["callback"], "")
-		cb = fmt.Sprintf("%s.onion", cb)
+		cb := fmt.Sprintf("%s.onion", strings.Join(request["callback"], ""))
 		cipher := strings.Join(request["cipher"], "")
-		err := c.AddNewUser(&NewUser{cb, addr, cipher})
-		if err != nil {
-			r := ResponseJSON{"nil", "can't save user"}
-			response, err := json.Marshal(r)
-			if err != nil {
-				r = ResponseJSON{"nil", err.Error()}
-				response, err = json.Marshal(r)
-				if err != nil {
-					response = []byte(DEFAULT_ERROR)
-				}
-			}
-			return string(response), nil
+		if err := c.AddNewUser(&NewUser{cb, addr, cipher}); err != nil {
+			return formResponse("", "can't save user"), nil
 		}
-		r := ResponseJSON{c.GetSelfAddress(), "nil"}
-		response, err := json.Marshal(r)
-		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
-			}
-		}
-		return string(response), nil
+		return formResponse(c.GetSelfAddress(), ""), nil
 	default:
-		r := ResponseJSON{"nil", "unrecognized call"}
-		response, err := json.Marshal(r)
-		if err != nil {
-			r = ResponseJSON{"nil", err.Error()}
-			response, err = json.Marshal(r)
-			if err != nil {
-				response = []byte(DEFAULT_ERROR)
+		return formResponse("", "unrecognized call"), nil
+	}
+}
+
+func formResponse(response string, err string) string {
+	if err != "" {
+		responseStruct := ResponseJSON{"nil", err}
+		responseStructStringified, e := json.Marshal(responseStruct)
+		if e != nil {
+			responseStruct = ResponseJSON{"nil", err}
+			responseStructStringified, e = json.Marshal(responseStruct)
+			if e != nil {
+				responseStructStringified = []byte(DEFAULT_ERROR)
 			}
 		}
-		return string(response), nil
+		return string(responseStructStringified)
 	}
+	responseStruct := ResponseJSON{response, "nil"}
+	responseStructStringified, e := json.Marshal(responseStruct)
+	if e != nil {
+		responseStruct = ResponseJSON{"nil", err}
+		responseStructStringified, e = json.Marshal(responseStruct)
+		if e != nil {
+			responseStructStringified = []byte(DEFAULT_ERROR)
+		}
+	}
+	return string(responseStructStringified)
 }
 
 func (c *Commander) RunRealServer() {
