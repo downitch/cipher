@@ -26,6 +26,7 @@ const(
 	Read   Status = "read"
 	Fail   Status = "fail"
 	Unread Status = "unread"
+	New    Status = "new"
 )
 
 type NewUser struct {
@@ -35,11 +36,12 @@ type NewUser struct {
 }
 
 type User struct {
-	Username 		 string     `json:"username"`
-	Link 		 		 string     `json:"link"`
-	Addr 		 		 string     `json:"addr"`
-	LastMessage  NewMessage `json:"lastMessage"`
-	NewMessages  string     `json:"newMessages"`
+	Username 		  string       `json:"username"`
+	Link 		 		  string       `json:"link"`
+	Addr 		 		  string       `json:"addr"`
+	LastMessage   NewMessage   `json:"lastMessage"`
+	NewMessages   string       `json:"newMessages"`
+	Notifications []NewMessage `json:"notifications"`
 }
 
 func (c *Commander) UpdateStorage() bool {
@@ -202,6 +204,7 @@ func (c *Commander) GetChats() []User {
 			// fmt.Println(err)
 			return []User{}
 		}
+		notifications := c.GetNotifications(address)
 		newMsgsStringified := strconv.Itoa(newMsgs)
 		users = append(
 			users, User{
@@ -209,7 +212,8 @@ func (c *Commander) GetChats() []User {
 				link,
 				address,
 				lastMsg,
-				newMsgsStringified})
+				newMsgsStringified,
+				notifications})
 	}
 	err = rows.Err()
 	if err != nil {
@@ -226,6 +230,7 @@ func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
 	if err != nil {
 		return []NewMessage{}, err
 	}
+	defer closeDB(db)
 	stmnt := `select id, origin, date, status, sender, input from messages;`
 	rows, err := db.Query(stmnt)
 	if err != nil {
@@ -306,6 +311,39 @@ func (c *Commander) GetLastMessageId(addr string) int {
 	return id
 }
 
+func (c *Commander) GetNotifications(addr string) []NewMessage {
+	var messages []NewMessage
+	db, err := c.openDB(addr)
+	if err != nil {
+		return []NewMessage{}
+	}
+	defer closeDB(db)
+	stmnt := `select id, origin, date, status, sender, input from messages where status = 'new';`
+	rows, err := db.Query(stmnt)
+	if err != nil {
+		return []NewMessage{}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var origin string
+		var date string
+		var status string
+		var sender string
+		var input string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input)
+		if err != nil {
+			return []NewMessage{}
+		}
+		messages = append(messages, NewMessage{id, origin, date, status, sender, input})
+	}
+	err = rows.Err()
+	if err != nil {
+		return []NewMessage{}
+	}
+	return messages
+}
+
 func (c *Commander) GetNewMessages(addr string) (int, error) {
 	amount := 0
 	db, err := c.openDB(addr)
@@ -313,8 +351,8 @@ func (c *Commander) GetNewMessages(addr string) (int, error) {
 		return 0, err
 	}
 	defer closeDB(db)
-	stmnt := `select id from messages where status = ?;`
-	rows, err := db.Query(stmnt, "self")
+	stmnt := `select id from messages where status = ? or status = ?;`
+	rows, err := db.Query(stmnt, "self", "new")
 	if err != nil {
 		// fmt.Println(err)
 		return 0, err
@@ -339,6 +377,7 @@ func (c *Commander) GetMessageById(addr string, id int) NewMessage {
 	if err != nil {
 		return NewMessage{}
 	}
+	defer closeDB(db)
 	stmnt := "select id, origin, date, status, sender, input from messages where id = ?;"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
@@ -367,6 +406,21 @@ func (c *Commander) UpdateSelfMessages(address string) {
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where status = ?;`
 	_, err = db.Exec(stmnt, "down", "self")
+	if err != nil {
+		// fmt.Println(err)
+		return
+	}
+	return
+}
+
+func (c *Commander) UpdatedSelfNewMessages(address string) {
+	db, err := c.openDB(address)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+	stmnt := `update messages set status = ? where status = ?;`
+	_, err = db.Exec(stmnt, "self", "new")
 	if err != nil {
 		// fmt.Println(err)
 		return
@@ -506,7 +560,7 @@ func (c *Commander) DeleteContact(link string) bool {
 	return true
 }
 
-func (c *Commander) SaveMessage(addr string, rec string, msg string) int {
+func (c *Commander) SaveMessage(addr string, rec string, mtype string, msg string) int {
 	status := "sent"
 	db, err := c.openDB(rec)
 	if err != nil {
@@ -514,7 +568,7 @@ func (c *Commander) SaveMessage(addr string, rec string, msg string) int {
 	}
 	defer closeDB(db)
 	if addr == rec {
-		status = "self"
+		status = "new"
 	}
 	date := strconv.Itoa(int(time.Now().Unix()))
 	stmnt := fmt.Sprintf(
@@ -528,7 +582,7 @@ func (c *Commander) SaveMessage(addr string, rec string, msg string) int {
 		'%s',
 		'%s',
 		'%s',
-		'%s');`, "text", date, status, addr, msg)
+		'%s');`, mtype, date, status, addr, msg)
 	_, err = db.Exec(stmnt)
 	if err != nil {
 		// fmt.Println("Statement broken")

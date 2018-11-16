@@ -1,11 +1,49 @@
 package api
 
 import(
+	"fmt"
+	"bytes"
+	"encoding/base64"
 	"errors"
 	"os"
 	"io/ioutil"
 	"strings"
+	"image/png"
+	"github.com/jakobvarmose/go-qidenticon"
+	qrcode "github.com/skip2/go-qrcode"
 )
+
+func GetHexColor(hash string) string {
+	hash = strings.Split(hash, "x")[1]
+	return hash[:6]
+}
+
+func (c *Commander) GenAvatar(link string) string {
+	address := c.GetAddressByLink(link)
+	input := fmt.Sprintf("%s%s", link, address)
+	inputHexed := Hexify(input)
+	code := qidenticon.Code(inputHexed)
+	size := 200
+	settings := qidenticon.DefaultSettings()
+	img := qidenticon.Render(code, size, settings)
+	var buff bytes.Buffer
+	png.Encode(&buff, img)
+	enc := base64.StdEncoding.EncodeToString(buff.Bytes())
+	return enc
+}
+
+func (c *Commander) GenQrCode() string {
+	var png []byte
+	link := c.GetHSLink()
+	split := strings.Split(link, ".")
+	res := split[0]
+	png, err := qrcode.Encode(res, qrcode.Medium, 256)
+	if err != nil {
+		return ""
+	}
+	enc := base64.StdEncoding.EncodeToString(png)
+	return enc
+}
 
 func (c *Commander) GetHSLink() string {
 	path := c.ConstantPath

@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"strconv"
+	"time"
+
+	"github.com/stackimpact/stackimpact-go"
 )
 
 type ResponseJSON struct {
@@ -53,12 +56,42 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, msg)
+		id := c.SaveMessage(a, rec, "text", msg)
 		if id == 0 {
 			return formResponse("", "can't save message"), nil
 		}
 		go func() {
 			r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			if err != nil {
+				c.UpdateFailedMessage(id, rec)
+			}
+			res := &ResponseJSON{}
+			err = json.Unmarshal([]byte(r), res)
+			if err != nil || res.Res != "ok" {
+				c.UpdateFailedMessage(id, rec)
+			}
+		}()
+		return formResponse(tx, ""), nil
+	case "sysSend":
+		rec := strings.Join(request["recepient"], "")
+		cb := c.GetLinkByAddress(rec)
+		if cb == "" {
+			return formResponse("", "transaction didn't happen"), nil
+		}
+		msg := strings.Join(request["msg"], "")
+		emsg := c.CipherMessage(rec, msg)
+		tx, err := FormRawTxWithBlockchain(emsg, rec)
+		if err != nil {
+			return formResponse("", "can't form transaction"), nil
+		}
+		link := c.GetHSLink()
+		a := c.GetSelfAddress()
+		id := c.SaveMessage(a, rec, "system", msg)
+		if id == 0 {
+			return formResponse("", "can't save message"), nil
+		}
+		go func() {
+			r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=system")
 			if err != nil {
 				c.UpdateFailedMessage(id, rec)
 			}
@@ -136,7 +169,14 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		return formResponse(balance, ""), nil
 	case "notify":
 		cb := strings.Join(request["callback"], "")
+		t := strings.Join(request["type"], "")
+		if t == "" {
+			t = "text"
+		}
 		addr := c.GetAddressByLink(cb)
+		if addr == "" {
+			return formResponse("", "no such user found"), nil
+		}
 		tx := strings.Join(request["tx"], "")
 		trimmedTx := strings.Split(tx, "x")[1]
 		decodedTx, err := DecodeRawTx(trimmedTx)
@@ -145,8 +185,12 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		}
 		res := c.DecipherMessage(addr, decodedTx)
 		m := fmt.Sprintf("%s", res)
-		saved := c.SaveMessage(addr, addr, m)
+		saved := c.SaveMessage(addr, addr, t, m)
 		if saved > 0 {
+			go func(c *Commander, addr string) {
+				time.Sleep(time.Second * 5)
+				c.UpdatedSelfNewMessages(addr)
+			}(c, addr)
 			return formResponse("ok", ""), nil
 		}
 		return formResponse("", "can't save message"), nil
@@ -160,9 +204,9 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 		hexedCipher := Hexify(cipher)
 		link := strings.Split(c.GetHSLink(), ".")[0]
 		selfAddr := c.GetSelfAddress()
-		formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=%s&address=%s
-			&cipher=%s`, cb, link, selfAddr, hexedCipher)
-		response, err := RequestWithTimeout(formattedUrl)
+		formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=%s&address=%s&cipher=%s`, cb, link, selfAddr, hexedCipher)
+		fmt.Println(formattedUrl)
+		response, err := Request(formattedUrl)
 		if err != nil {
 			return formResponse("", err.Error()), nil
 		}
@@ -213,6 +257,10 @@ func formResponse(response string, err string) string {
 }
 
 func (c *Commander) RunRealServer() {
+	// stackimpact.Start(stackimpact.Options{
+	//   AgentKey: "058d0f9bfc13ffc3ab893174159224c87f8c0c4e",
+	//   AppName: "MyGoApp"})
+	
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
