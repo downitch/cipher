@@ -66,6 +66,20 @@ func (c *Commander) UpdateStorage() bool {
 		return false
 	}
 	closeDB(db)
+	db, err = c.openDB("blocks")
+	if err != nil {
+		return false
+	}
+	stmnt = `create table if not exists blocks(
+	id integer not null primary key,
+	hash text,
+	number int);`
+	_, err = db.Exec(stmnt)
+	if err != nil {
+		closeDB(db)
+		return false
+	}
+	closeDB(db)
 	return true
 }
 
@@ -486,6 +500,70 @@ func (c *Commander) UpdateUnreadMessage(id int, address string) {
 		return
 	}
 	return
+}
+
+func(c *Commander) SaveBlock(hash string, number int) error {
+	db, err := c.openDB("blocks")
+	if err != nil {
+		return err
+	}
+	stmnt := "select count(*) from blocks"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		return err
+	}
+	var amount int
+	err = st.QueryRow().Scan(&amount)
+	if err != nil {
+		return err
+	}
+	st.Close()
+	closeDB(db)
+	if amount > 25 {
+		return nil
+	}
+	db, err = c.openDB("blocks")
+	if err != nil {
+		return err
+	}
+	defer closeDB(db)
+	stmnt = fmt.Sprintf(`insert into blocks(hash, number) values('%s', '%d')`, hash, number)
+	_, err = db.Exec(stmnt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Commander) GetRandomBlockFromDB() RandomBlock {
+	db, err := c.openDB("blocks")
+	if err != nil {
+		fmt.Println(err)
+		return RandomBlock{}
+	}
+	defer closeDB(db)
+	stmnt := "select id, hash, number from blocks where id >= (abs(random()) % (SELECT max(id) FROM blocks)) limit 1"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		fmt.Println(err)
+		return RandomBlock{}
+	}
+	var id int
+	var hash string
+	var number int
+	err = st.QueryRow().Scan(&id, &hash, &number)
+	if err != nil {
+		fmt.Println(err)
+		return RandomBlock{}
+	}
+	st.Close()
+	stmnt = fmt.Sprintf(`delete from blocks where id = '%d'`, id)
+	_, err = db.Exec(stmnt)
+	if err != nil {
+		fmt.Println(err)
+		return RandomBlock{}
+	}
+	return RandomBlock{hash, number}
 }
 
 func (c *Commander) AddNewUser(u *NewUser) error {

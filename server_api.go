@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stackimpact/stackimpact-go"
+	// "github.com/stackimpact/stackimpact-go"
 )
 
 type ResponseJSON struct {
@@ -18,7 +18,7 @@ type ResponseJSON struct {
 
 var DEFAULT_ERROR = `{"res": "nil", "error": "can't convert struct to JSON"}`
 
-var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) (string, error) {
+var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, error) {
 	call := strings.Join(request["call"], "")
 	switch call {
 	case "id":
@@ -61,7 +61,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			return formResponse("", "can't save message"), nil
 		}
 		go func() {
-			r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			if err != nil {
 				c.UpdateFailedMessage(id, rec)
 			}
@@ -91,7 +91,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			return formResponse("", "can't save message"), nil
 		}
 		go func() {
-			r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=system")
+			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=system")
 			if err != nil {
 				c.UpdateFailedMessage(id, rec)
 			}
@@ -117,6 +117,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			return formResponse("", "transaction didn't happen"), nil
 		}
 		link := c.GetHSLink()
+		c.UpdateUnfailMessage(id, addr)
 		r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 		if err != nil {
 			c.UpdateFailedMessage(id, addr)
@@ -128,7 +129,6 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander, busy int) 
 			c.UpdateFailedMessage(id, addr)
 			return formResponse("", "recepient can't save message"), nil
 		}
-		c.UpdateUnfailMessage(id, addr)
 		return formResponse(tx, ""), nil
 	case "inbox":
 		response := "nil"
@@ -260,11 +260,11 @@ func (c *Commander) RunRealServer() {
 	// stackimpact.Start(stackimpact.Options{
 	//   AgentKey: "058d0f9bfc13ffc3ab893174159224c87f8c0c4e",
 	//   AppName: "MyGoApp"})
-	
+
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response, _ := DEFAULT_HANDLER(r.URL.Query(), c, 0)
+			response, _ := DEFAULT_HANDLER(r.URL.Query(), c)
 			// sending back the response as web-server answer
 			w.Write([]byte(response))
 		})}

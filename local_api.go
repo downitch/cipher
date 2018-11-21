@@ -35,9 +35,11 @@ func (c *Commander) GenAvatar(link string) string {
 func (c *Commander) GenQrCode() string {
 	var png []byte
 	link := c.GetHSLink()
+	addr := c.GetSelfAddress()
 	split := strings.Split(link, ".")
 	res := split[0]
-	png, err := qrcode.Encode(res, qrcode.Medium, 256)
+	input := fmt.Sprintf("%s:%s", res, addr)
+	png, err := qrcode.Encode(input, qrcode.Medium, 512)
 	if err != nil {
 		return ""
 	}

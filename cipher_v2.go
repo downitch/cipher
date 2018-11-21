@@ -98,7 +98,13 @@ func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 	bytedMessage := []byte(msg)
 	// b represents message
 	b := base64.StdEncoding.EncodeToString(bytedMessage)
-	rblock, _ := GetRandomBlock()
+	rblock := c.GetRandomBlockFromDB()
+	if rblock == (RandomBlock{}) {
+		go func() {
+			c.GetManyRandomBlocks()
+		}()
+		rblock, _ = GetRandomBlock()
+	}
 	randomCipher := rblock.hash
 	number := rblock.number
 	strNumber := strconv.Itoa(number)
