@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -49,6 +50,70 @@ func Request(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// receiving response
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	// never forgetting to close response buffer at the end
+	defer resp.Body.Close()
+	// reading buffer into slice of bytes
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	// parsed slice converted to string
+	return string(b), nil
+}
+
+func RequestHTTPS(url string) (string, error) {
+	// creating new dialer that will pass request over the proxy
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		return "", err
+	}
+	// creating all the structures, getting ready firing request
+	httpTransport := &http.Transport{}
+	httpClient := &http.Client{Transport: httpTransport}
+	httpTransport.Dial = dialer.Dial
+	// requesting...
+	req, err := http.NewRequest("GET", "https://" + url, nil)
+	if err != nil {
+		return "", err
+	}
+	// receiving response
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	// never forgetting to close response buffer at the end
+	defer resp.Body.Close()
+	// reading buffer into slice of bytes
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	// parsed slice converted to string
+	return string(b), nil
+}
+
+func RequestPostHTTPS(uri string, contentType string, bodyBuf *bytes.Buffer) (string, error) {
+	// creating new dialer that will pass request over the proxy
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		return "", err
+	}
+	// creating all the structures, getting ready firing request
+	httpTransport := &http.Transport{}
+	httpClient := &http.Client{Transport: httpTransport}
+	httpTransport.Dial = dialer.Dial
+	// requesting...
+	req, err := http.NewRequest("POST", "https://" + uri, bodyBuf)
+	req.Header.Set("Content-Type", contentType)
+	if err != nil {
+		return "", err
+	}
+	// req.Header.Add("Content-Type", contentType)
 	// receiving response
 	resp, err := httpClient.Do(req)
 	if err != nil {
