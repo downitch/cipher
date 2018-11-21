@@ -1,24 +1,17 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
+	"time"
 
 	"golang.org/x/net/proxy"
 )
-
-func (c *Commander) GetHSLink() string {
-	path := c.ConstantPath
-	pathToHostname := path + "/hs/hostname"
-	data, _ := ioutil.ReadFile(pathToHostname)
-	link := strings.Split(string(data), "\n")[0]
-	return link
-}
 
 // This function should be fired everytime Tor Hidden Service is running
 func (c *Commander) ConfigureTorrc() error {
@@ -70,6 +63,52 @@ func Request(url string) (string, error) {
 	}
 	// parsed slice converted to string
 	return string(b), nil
+}
+
+func RequestWithTimeout(url string) (string, error) {
+	timeout := make(chan string, 1)
+	// creating new dialer that will pass request over the proxy
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+	if err != nil {
+		return "", err
+	}
+	// creating all the structures, getting ready firing request
+	httpTransport := &http.Transport{}
+	httpClient := &http.Client{Transport: httpTransport}
+	httpTransport.Dial = dialer.Dial
+	resp := &http.Response{}
+	go func() {
+		// requesting...
+		req, err := http.NewRequest("GET", "http://" + url, nil)
+		if err != nil {
+			timeout <- "fail"
+			return
+		}
+		// receiving response
+		resp, err = httpClient.Do(req)
+		if err != nil {
+			timeout <- "fail"
+			return
+		}
+		timeout <- "done"
+	}()
+	select {
+	case res := <-timeout:
+		if res != "fail" {
+			// never forgetting to close response buffer at the end
+			defer resp.Body.Close()
+			// reading buffer into slice of bytes
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return "", err
+			}
+			// parsed slice converted to string
+			return string(b), nil
+		}
+		return "", errors.New("No response for request")
+	case <-time.After(15 * time.Second):
+		return "", errors.New("Timeout reached")
+	}
 }
 
 // This function is highly experimental, because windows is kinda weird

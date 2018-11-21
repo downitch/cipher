@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	random "math/rand"
 	"strconv"
 	"strings"
@@ -79,27 +78,33 @@ func Dehexify(source string) ([]byte, error) {
 	return []byte(result), err
 }
 
-func parseCurrentCipher(path string, receiver string) (string, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return "", errors.New("can't parse file")
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		split := strings.Split(line, "*:*")
-		if split[1] == receiver {
-			return split[2], nil
-		}
-	}
-	return "", errors.New("receiver not found")
-}
+// func parseCurrentCipher(path string, receiver string) (string, error) {
+// 	data, err := ioutil.ReadFile(path)
+// 	if err != nil {
+// 		return "", errors.New("can't parse file")
+// 	}
+// 	for _, line := range strings.Split(string(data), "\n") {
+// 		split := strings.Split(line, "*:*")
+// 		if split[1] == receiver {
+// 			return split[2], nil
+// 		}
+// 	}
+// 	return "", errors.New("receiver not found")
+// }
 
 func (c *Commander) CipherMessage(receiver string, msg string) []byte {
-	realPath := c.ConstantPath + "/history/history"
+	// realPath := c.ConstantPath + "/history/history"
 	// now all the encryption works only with byte slices
 	bytedMessage := []byte(msg)
 	// b represents message
 	b := base64.StdEncoding.EncodeToString(bytedMessage)
-	rblock, _ := GetRandomBlock()
+	rblock := c.GetRandomBlockFromDB()
+	if rblock == (RandomBlock{}) {
+		go func() {
+			c.GetManyRandomBlocks()
+		}()
+		rblock, _ = GetRandomBlock()
+	}
 	randomCipher := rblock.hash
 	number := rblock.number
 	strNumber := strconv.Itoa(number)
@@ -108,7 +113,7 @@ func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 	decodedRandomCipher, _ := Dehexify(randomCipher)
 	randomBlock, _ := aes.NewCipher(decodedRandomCipher)
 	// parsing our database to get correct cipher from there
-	constCipher, _ := parseCurrentCipher(realPath, receiver)
+	constCipher := c.GetCipherByAddress(receiver)
 	decodedCipher, _ := Dehexify(constCipher)
 	constBlock, _ := aes.NewCipher(decodedCipher)
 	// creating variable that will contain encrypted number
@@ -143,9 +148,9 @@ func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	split := strings.Split(strMsg, " 42 58 42 ")
 	num := BytifyString(split[0])
 	msg = BytifyString(split[1])
-	realPath := c.ConstantPath + "/history/history"
+	// realPath := c.ConstantPath + "/history/history"
 	// parsing our database to get correct cipher from there
-	constCipher, _ := parseCurrentCipher(realPath, receiver)
+	constCipher := c.GetCipherByAddress(receiver)
 	decodedCipher, _ := Dehexify(constCipher)
 	block, _ := aes.NewCipher(decodedCipher)
 	if len(num) < aes.BlockSize {

@@ -96,6 +96,29 @@ func GetRandomBlock() (RandomBlock, error) {
 	return RandomBlock{ data, randomInt }, nil
 }
 
+func (c *Commander) GetManyRandomBlocks() {
+	fmt.Println("generating new blocks...")
+	limit := 50
+	step := 1
+	latest, _ := GetLatestBlock()
+	latestInt, _ := strconv.Atoi(latest)
+	latestInt = latestInt - 1
+	for {
+		if step > limit {
+			break
+		}
+		randomInt := rand.Intn(latestInt)
+		randomInt = randomInt + 1
+		data, _ := GetBlockHash(int64(randomInt))
+		err := c.SaveBlock(data, randomInt)
+		if err != nil {
+			break
+		}
+		step = step + 1
+	}
+	return
+}
+
 // This function will be later only available locally as it
 // formats, ciphers and sends the message from current wallet
 // to the recepients wallet address over ETH Blockchain
