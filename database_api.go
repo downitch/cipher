@@ -42,6 +42,7 @@ type User struct {
 	LastMessage   NewMessage   `json:"lastMessage"`
 	NewMessages   string       `json:"newMessages"`
 	Notifications []NewMessage `json:"notifications"`
+	LastOnline    string       `json:"lastOnline"`
 }
 
 func (c *Commander) UpdateStorage() bool {
@@ -220,6 +221,7 @@ func (c *Commander) GetChats() []User {
 		}
 		notifications := c.GetNotifications(address)
 		newMsgsStringified := strconv.Itoa(newMsgs)
+		lastOnline, _ := c.GetLastOnline(address)
 		users = append(
 			users, User{
 				username,
@@ -227,7 +229,8 @@ func (c *Commander) GetChats() []User {
 				address,
 				lastMsg,
 				newMsgsStringified,
-				notifications})
+				notifications,
+				lastOnline})
 	}
 	err = rows.Err()
 	if err != nil {
@@ -269,6 +272,26 @@ func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
 		return []NewMessage{}, err
 	}
 	return messages, nil
+}
+
+func (c *Commander) GetLastOnline(addr string) (string, error) {
+	db, err := c.openDB(addr)
+	if err != nil {
+		return "0", err
+	}
+	defer closeDB(db)
+	stmnt := "select date from messages where sender = ? order by id desc limit 1;"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		return "0", nil
+	}
+	defer st.Close()
+	var date string
+	err = st.QueryRow(addr).Scan(&date)
+	if err != nil {
+		return "0", nil
+	}
+	return date, nil
 }
 
 func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
