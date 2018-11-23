@@ -7,6 +7,7 @@ import(
 	"os"
 	"io"
 	"mime/multipart"
+	"strings"
 )
 
 type ipfsResponse struct {
@@ -27,35 +28,42 @@ func (c *Commander) CatFileFromIPFS(hash string) ([]byte, error) {
 	return []byte(data), nil
 }
 
-func (c *Commander) AddFileToIPFS(filename string) (string, error) {
-	fullPath := c.ConstantPath + "/" + filename
+func (c *Commander) AddFileToIPFS(filepath string) string {
+	split := strings.Split(filepath, "/")
+	filename := split[len(split) - 1]
+	split = nil
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
 	fileWriter, err := bodyWriter.CreateFormFile("uploadfile", filename)
 	if err != nil {
 		fmt.Println("error writing to buffer")
-		return "", err
+		fmt.Println(err)
+		return ""
 	}
-	fh, err := os.Open(fullPath)
+	fh, err := os.Open(filepath)
 	if err != nil {
 		fmt.Println("error opening file")
-		return "", err
+		fmt.Println(err)
+		return ""
 	}
 	defer fh.Close()
 	_, err = io.Copy(fileWriter, fh)
 	if err != nil {
-		return "", err
+		fmt.Println(err)
+		return ""
 	}
 	contentType := bodyWriter.FormDataContentType()
 	bodyWriter.Close()
 	data, err := RequestPostHTTPS(URLAdd, contentType, bodyBuf)
 	if err != nil {
-		return "", err
+		fmt.Println(err)
+		return ""
 	}
 	response := &ipfsResponse{}
 	err = json.Unmarshal([]byte(data), response)
 	if err != nil {
-		return "", err
+		fmt.Println(err)
+		return ""
 	}
-	return response.Hash, nil
+	return response.Hash
 }

@@ -102,6 +102,36 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 			}
 		}()
 		return formResponse(tx, ""), nil
+	case "fileSend":
+		rec := strings.Join(request["recepient"], "")
+		cb := c.GetLinkByAddress(rec)
+		if cb == "" {
+			return formResponse("", "transaction didn't happen"), nil
+		}
+		msg := strings.Join(request["msg"], "")
+		emsg := c.CipherMessage(rec, msg)
+		tx, err := FormRawTxWithBlockchain(emsg, rec)
+		if err != nil {
+			return formResponse("", "can't form transaction"), nil
+		}
+		link := c.GetHSLink()
+		a := c.GetSelfAddress()
+		id := c.SaveMessage(a, rec, "file", msg)
+		if id == 0 {
+			return formResponse("", "can't save message"), nil
+		}
+		go func() {
+			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=file")
+			if err != nil {
+				c.UpdateFailedMessage(id, rec)
+			}
+			res := &ResponseJSON{}
+			err = json.Unmarshal([]byte(r), res)
+			if err != nil || res.Res != "ok" {
+				c.UpdateFailedMessage(id, rec)
+			}
+		}()
+		return formResponse(tx, ""), nil
 	case "resend":
 		addr := strings.Join(request["address"], "")
 		iid := strings.Join(request["id"], "")
@@ -118,7 +148,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		}
 		link := c.GetHSLink()
 		c.UpdateUnfailMessage(id, addr)
-		r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
+		r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=" + msg.Type)
 		if err != nil {
 			c.UpdateFailedMessage(id, addr)
 			return formResponse("", "user is offline"), nil
