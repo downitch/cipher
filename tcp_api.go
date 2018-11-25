@@ -9,7 +9,7 @@ import(
 
 func handleTCP(conn net.Conn) error {
 	defer func() {
-		log.Printf("closing connection from %v", conn.RemoteAddr())
+		log.Printf("closing connection from %v now", conn.RemoteAddr())
 		conn.Close()
 	}()
 	r := bufio.NewReader(conn)
