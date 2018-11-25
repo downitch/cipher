@@ -70,11 +70,6 @@ func GetLatestBlock() (string, error) {
 	return header.Number.String(), nil
 }
 
-// func GetLatestBlock() (string, error) {
-// 	resp, err := Request("api.blockcypher.com/v1/eth/main")
-
-// }
-
 // This function receives block number, casts it to bigInt and returns hash
 func GetBlockHash(number int64) (string, error) {
 	client, _ := runGeth()
@@ -86,6 +81,7 @@ func GetBlockHash(number int64) (string, error) {
 	return strings.Split(block.Hash().Hex(), "x")[1], nil
 }
 
+// This function let's caller get random block from an updated blockchain
 func GetRandomBlock() (RandomBlock, error) {
 	latest, _ := GetLatestBlock()
 	latestInt, _ := strconv.Atoi(latest)
@@ -96,6 +92,9 @@ func GetRandomBlock() (RandomBlock, error) {
 	return RandomBlock{ data, randomInt }, nil
 }
 
+// This function writes down 50 random blocks one-by-one
+// in compare to all other functions this one is built wrong
+// since it directly communicates with database, which is wrong
 func (c *Commander) GetManyRandomBlocks() {
 	fmt.Println("generating new blocks...")
 	limit := 50

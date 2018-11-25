@@ -321,6 +321,7 @@ func (c *Commander) RunRealServer() {
 	//   AgentKey: "058d0f9bfc13ffc3ab893174159224c87f8c0c4e",
 	//   AppName: "MyGoApp"})
 
+	// Here we define our HTTP web-server that will be visible from darkweb
 	server := &http.Server {
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

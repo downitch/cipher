@@ -16,10 +16,16 @@ import (
 
 // This function should be fired everytime Tor Hidden Service is running
 func (c *Commander) ConfigureTorrc() error {
+	var chmoderror error
 	path := c.ConstantPath
+	// either creating a new file or writing to one that exists
+	tcpPath := fmt.Sprintf("%s/tcp", path)
 	hsPath := fmt.Sprintf("%s/hs", path)
   // formatting onion service setup
-	settings := fmt.Sprintf("HiddenServiceDir %s", hsPath)
+	settings := fmt.Sprintf("HiddenServiceDir %s", tcpPath)
+	settings = fmt.Sprintf("%s\nHiddenServicePort 88 127.0.0.1:4888", settings)
+  // formatting onion service setup
+	settings = fmt.Sprintf("%s\n\nHiddenServiceDir %s", settings, hsPath)
 	settings = fmt.Sprintf("%s\nHiddenServicePort 80 127.0.0.1:4887", settings)
 	// either creating a new file or writing to one that exists
 	err := ioutil.WriteFile(path + "/torrc", []byte(settings), 0644)
@@ -29,10 +35,16 @@ func (c *Commander) ConfigureTorrc() error {
 	// chmodding directory where application is running
 	switch runtime.GOOS {
 	case "windows":
-		return os.Chmod(hsPath, 0600)
+		chmoderror = os.Chmod(tcpPath, 0600)
+		chmoderror = os.Chmod(hsPath, 0600)
 	default:
-		return os.Chmod(hsPath, 0700)
+		chmoderror = os.Chmod(tcpPath, 0700)
+		chmoderror = os.Chmod(hsPath, 0700)
 	}
+	if chmoderror != nil {
+		return chmoderror
+	}
+	return nil
 }
 
 func Request(url string) (string, error) {

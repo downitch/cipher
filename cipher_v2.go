@@ -78,20 +78,6 @@ func Dehexify(source string) ([]byte, error) {
 	return []byte(result), err
 }
 
-// func parseCurrentCipher(path string, receiver string) (string, error) {
-// 	data, err := ioutil.ReadFile(path)
-// 	if err != nil {
-// 		return "", errors.New("can't parse file")
-// 	}
-// 	for _, line := range strings.Split(string(data), "\n") {
-// 		split := strings.Split(line, "*:*")
-// 		if split[1] == receiver {
-// 			return split[2], nil
-// 		}
-// 	}
-// 	return "", errors.New("receiver not found")
-// }
-
 func (c *Commander) CipherMessage(receiver string, msg string) []byte {
 	// realPath := c.ConstantPath + "/history/history"
 	// now all the encryption works only with byte slices
