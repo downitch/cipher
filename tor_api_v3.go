@@ -21,10 +21,10 @@ func (c *Commander) ConfigureTorrc() error {
 	// either creating a new file or writing to one that exists
 	tcpPath := fmt.Sprintf("%s/tcp", path)
 	hsPath := fmt.Sprintf("%s/hs", path)
-  // formatting onion service setup
+	// formatting onion service setup
 	settings := fmt.Sprintf("HiddenServiceDir %s", tcpPath)
 	settings = fmt.Sprintf("%s\nHiddenServicePort 88 127.0.0.1:4888", settings)
-  // formatting onion service setup
+	// formatting onion service setup
 	settings = fmt.Sprintf("%s\n\nHiddenServiceDir %s", settings, hsPath)
 	settings = fmt.Sprintf("%s\nHiddenServicePort 80 127.0.0.1:4887", settings)
 	// either creating a new file or writing to one that exists

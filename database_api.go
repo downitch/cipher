@@ -17,6 +17,7 @@ type NewMessage struct {
 	Status   string `json:"status"`
 	Sender   string `json:"author"`
 	Text     string `json:"text"`
+	Pinned   string `json:"pinned"`
 }
 
 type Status string
@@ -43,6 +44,36 @@ type User struct {
 	NewMessages   string       `json:"newMessages"`
 	Notifications []NewMessage `json:"notifications"`
 	LastOnline    string       `json:"lastOnline"`
+}
+
+func (c *Commander) AddTableColumn(tname string, cname string, ctype string, dvalue string, dbname string) {
+	dbnames := []string{dbname}
+	for i := range dbnames {
+		db, err := c.openDB(dbnames[i])
+		if err != nil {
+			e := fmt.Sprintf("No such database with name %s found", dbnames[i])
+			fmt.Println(e)
+			return
+		}
+		defer closeDB(db)
+		stmnt := fmt.Sprintf("select %s from %s limit 1;", cname, tname)
+		_, err = db.Prepare(stmnt)
+		if err != nil {
+			stmnt = fmt.Sprintf("alter table %s add column %s %s;", tname, cname, ctype)
+			_, err = db.Exec(stmnt)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Println("Can't alter table from database ", dbnames[i])
+				return
+			}
+			stmnt = fmt.Sprintf("update %s set %s = %s", tname, cname, dvalue)
+			_, err = db.Exec(stmnt)
+			if err != nil {
+				fmt.Println("Can't update to default value")
+				return
+			}
+		}
+	}
 }
 
 func (c *Commander) UpdateStorage() bool {
@@ -248,7 +279,7 @@ func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
 		return []NewMessage{}, err
 	}
 	defer closeDB(db)
-	stmnt := `select id, origin, date, status, sender, input from messages;`
+	stmnt := `select id, origin, date, status, sender, input, pinned from messages;`
 	rows, err := db.Query(stmnt)
 	if err != nil {
 		return []NewMessage{}, err
@@ -261,11 +292,12 @@ func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
 		var status string
 		var sender string
 		var input string
-		err = rows.Scan(&id, &origin, &date, &status, &sender, &input)
+		var pinned string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
 		if err != nil {
 			return []NewMessage{}, err
 		}
-		messages = append(messages, NewMessage{id, origin, date, status, sender, input})
+		messages = append(messages, NewMessage{id, origin, date, status, sender, input, pinned})
 	}
 	err = rows.Err()
 	if err != nil {
@@ -307,7 +339,8 @@ func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
 	date,
 	status,
 	sender,
-	input from messages where id = (select max(id) from messages);`
+	input,
+	pinned from messages where id = (select max(id) from messages);`
 	st, err := db.Prepare(stmnt)
 	if err != nil {
 		return NewMessage{}, nil
@@ -319,11 +352,12 @@ func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
 	var status string
 	var sender string
 	var input string
-	err = st.QueryRow().Scan(&id, &origin, &date, &status, &sender, &input)
+	var pinned string
+	err = st.QueryRow().Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
 	if err != nil {
 		return NewMessage{}, nil
 	}
-	msg = NewMessage{id, origin, date, status, sender, input}
+	msg = NewMessage{id, origin, date, status, sender, input, pinned}
 	// fmt.Println(msg)
 	return msg, nil
 }
@@ -355,7 +389,7 @@ func (c *Commander) GetNotifications(addr string) []NewMessage {
 		return []NewMessage{}
 	}
 	defer closeDB(db)
-	stmnt := `select id, origin, date, status, sender, input from messages where status = 'new';`
+	stmnt := `select id, origin, date, status, sender, input, pinned from messages where status = 'new';`
 	rows, err := db.Query(stmnt)
 	if err != nil {
 		return []NewMessage{}
@@ -368,11 +402,12 @@ func (c *Commander) GetNotifications(addr string) []NewMessage {
 		var status string
 		var sender string
 		var input string
-		err = rows.Scan(&id, &origin, &date, &status, &sender, &input)
+		var pinned string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
 		if err != nil {
 			return []NewMessage{}
 		}
-		messages = append(messages, NewMessage{id, origin, date, status, sender, input})
+		messages = append(messages, NewMessage{id, origin, date, status, sender, input, pinned})
 	}
 	err = rows.Err()
 	if err != nil {
@@ -415,7 +450,7 @@ func (c *Commander) GetMessageById(addr string, id int) NewMessage {
 		return NewMessage{}
 	}
 	defer closeDB(db)
-	stmnt := "select id, origin, date, status, sender, input from messages where id = ?;"
+	stmnt := "select id, origin, date, status, sender, input, pinned from messages where id = ?;"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
 		return NewMessage{}
@@ -427,11 +462,12 @@ func (c *Commander) GetMessageById(addr string, id int) NewMessage {
 	var status string
 	var sender string
 	var input string
-	err = st.QueryRow(id).Scan(&uid, &origin, &date, &status, &sender, &input)
+	var pinned string
+	err = st.QueryRow(id).Scan(&uid, &origin, &date, &status, &sender, &input, &pinned)
 	if err != nil {
 		return NewMessage{}
 	}
-	msg = NewMessage{uid, origin, date, status, sender, input}
+	msg = NewMessage{uid, origin, date, status, sender, input, pinned}
 	return msg
 }
 
@@ -661,6 +697,80 @@ func (c *Commander) DeleteContact(link string) bool {
 	return true
 }
 
+func (c *Commander) GetPinnedMessage(addr string) int {
+	db, err := c.openDB(addr)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+	defer closeDB(db)
+	stmnt := "select id from messages where pinned = ?"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+	defer st.Close()
+	var mid int
+	err = st.QueryRow("true").Scan(&mid)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+	return mid
+}
+
+func (c *Commander) PinMessage(addr string, mid int) {
+	db, err := c.openDB(addr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer closeDB(db)
+	stmnt := "select id from messages where pinned = ?"
+	st, err := db.Prepare(stmnt)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer st.Close()
+	id := 0
+	err = st.QueryRow("true").Scan(&id)
+	if err != nil {
+		stmnt = "update messages set pinned = ? where id = ?"
+		_, err = db.Exec(stmnt, "true", mid)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
+	if id != 0 {
+		c.UnpinMessage(addr)
+	}
+	stmnt = "update messages set pinned = ? where id = ?"
+	_, err = db.Exec(stmnt, "true", mid)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	return
+}
+
+func (c *Commander) UnpinMessage(addr string) {
+	db, err := c.openDB(addr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer closeDB(db)
+	stmnt := "update messages set pinned = ?"
+	_, err = db.Exec(stmnt, "false")
+	if err != nil {
+		fmt.Println(err)
+	}
+	return
+}
+
 func (c *Commander) SaveMessage(addr string, rec string, mtype string, msg string) int {
 	status := "sent"
 	db, err := c.openDB(rec)
@@ -678,12 +788,14 @@ func (c *Commander) SaveMessage(addr string, rec string, mtype string, msg strin
 		date,
 		status,
 		sender,
-		input) values(
+		input,
+		pinned) values(
 		'%s',
 		'%s',
 		'%s',
 		'%s',
-		'%s');`, mtype, date, status, addr, msg)
+		'%s',
+		'false');`, mtype, date, status, addr, msg)
 	_, err = db.Exec(stmnt)
 	if err != nil {
 		// fmt.Println("Statement broken")

@@ -63,11 +63,17 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		go func() {
 			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
 			if err != nil {
+				fmt.Println("Request failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 			res := &ResponseJSON{}
 			err = json.Unmarshal([]byte(r), res)
 			if err != nil || res.Res != "ok" {
+				fmt.Println("Response parsing failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 		}()
@@ -93,11 +99,17 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		go func() {
 			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=system")
 			if err != nil {
+				fmt.Println("Request failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 			res := &ResponseJSON{}
 			err = json.Unmarshal([]byte(r), res)
 			if err != nil || res.Res != "ok" {
+				fmt.Println("Response parsing failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 		}()
@@ -123,11 +135,17 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		go func() {
 			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=file")
 			if err != nil {
+				fmt.Println("Request failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 			res := &ResponseJSON{}
 			err = json.Unmarshal([]byte(r), res)
 			if err != nil || res.Res != "ok" {
+				fmt.Println("Response parsing failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 		}()
@@ -146,18 +164,24 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		}
 		link := c.GetHSLink()
 		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "file", msg)
+		id := c.SaveMessage(a, rec, "image", msg)
 		if id == 0 {
 			return formResponse("", "can't save message"), nil
 		}
 		go func() {
 			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=image")
 			if err != nil {
+				fmt.Println("Request failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 			res := &ResponseJSON{}
 			err = json.Unmarshal([]byte(r), res)
 			if err != nil || res.Res != "ok" {
+				fmt.Println("Response parsing failed, failing message")
+				fmt.Println(err)
+				fmt.Println("_______________________________")
 				c.UpdateFailedMessage(id, rec)
 			}
 		}()
@@ -178,7 +202,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, e
 		}
 		link := c.GetHSLink()
 		c.UpdateUnfailMessage(id, addr)
-		r, err := RequestWithTimeout(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=" + msg.Type)
+		r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=" + msg.Type)
 		if err != nil {
 			c.UpdateFailedMessage(id, addr)
 			return formResponse("", "user is offline"), nil
