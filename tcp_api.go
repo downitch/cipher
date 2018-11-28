@@ -122,7 +122,9 @@ func (c *Commander) RunTCPServer() {
 	}()
 	for {
 		if connection != nil {
-			c.SendBytes(connection, GenRandomString(128))
+			d := GenRandomString(128)
+			c.SendBytes(connection, d)
+			fmt.Println(d)
 		}
 	}
 }
