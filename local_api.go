@@ -55,6 +55,14 @@ func (c *Commander) GetHSLink() string {
 	return link
 }
 
+func (c *Commander) GetTCPHSLink() string {
+	path := c.ConstantPath
+	pathToHostname := path + "/tcp/hostname"
+	data, _ := ioutil.ReadFile(pathToHostname)
+	link := strings.Split(string(data), "\n")[0]
+	return link
+}
+
 func (c *Commander) GetSelfAddress() string {
 	path := c.ConstantPath
 	data, _ := ioutil.ReadFile(path + "/hs/address")

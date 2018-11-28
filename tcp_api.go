@@ -33,9 +33,10 @@ func (c *Commander) handleTCP(conn net.Conn) {
 		switch dataParts[0] {
 		case "handshake":
 			callerId := dataParts[1]
-			cbconn, _ = c.Call(callerId, "connected")
+			callerIdWithPort := fmt.Sprintf("%s:88", callerId)
+			cbconn, _ = c.Call(callerIdWithPort, "connected")
 			if cbconn != nil {
-				response := fmt.Sprintf("connected:%s\n", c.GetHSLink)
+				response := fmt.Sprintf("connected:%s\n", c.GetTCPHSLink())
 				w.WriteString(response)
 			} else {
 				fmt.Println("CANT CONNECT BACK")
@@ -83,7 +84,7 @@ func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
 		return conn, err
 	}
 	if status == "call" {
-		toSend := fmt.Sprintf("handshake:%s\n", c.GetHSLink())
+		toSend := fmt.Sprintf("handshake:%s\n", c.GetTCPHSLink())
 		_, err = conn.Write([]byte(toSend))
 		if err != nil {
 			return conn, err
@@ -93,7 +94,7 @@ func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
 }
 
 func (c *Commander) EndCall(conn net.Conn) {
-	c.SendBytes(conn, fmt.Sprintf("endCall:%s", c.GetHSLink()))
+	c.SendBytes(conn, fmt.Sprintf("endCall:%s", c.GetTCPHSLink()))
 	conn.Close()
 	return
 }
