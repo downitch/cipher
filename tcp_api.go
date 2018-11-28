@@ -33,7 +33,8 @@ func (c *Commander) handleTCP(conn net.Conn, connection *net.Conn) {
 		case "handshake":
 			callerId := dataParts[1]
 			callerIdWithPort := fmt.Sprintf("%s:88", callerId)
-			connection, _ = c.Call(callerIdWithPort, "connected")
+			cbconn, _ := c.Call(callerIdWithPort, "connected")
+			connection = &cbconn
 			if connection != nil {
 				response := fmt.Sprintf("connected:%s\n", c.GetTCPHSLink())
 				w.WriteString(response)
@@ -70,25 +71,25 @@ func (c *Commander) SendBytes(conn net.Conn, input string) bool {
 	return true
 }
 
-func (c *Commander) Call(callerId string, status string) (*net.Conn, error) {
+func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
 	var conn net.Conn
 	var err error
 	dailer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, &net.Dialer{})
 	if err != nil {
-		return &conn, err
+		return conn, err
 	}
 	conn, err = dailer.Dial("tcp", callerId)
 	if err != nil {
-		return &conn, err
+		return conn, err
 	}
 	if status == "call" {
 		toSend := fmt.Sprintf("handshake:%s\n", c.GetTCPHSLink())
 		_, err = conn.Write([]byte(toSend))
 		if err != nil {
-			return &conn, err
+			return conn, err
 		}
 	}
-	return &conn, nil
+	return conn, nil
 }
 
 func (c *Commander) EndCall(conn net.Conn) {
