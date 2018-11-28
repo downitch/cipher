@@ -11,7 +11,8 @@ import(
 	"golang.org/x/net/proxy"
 )
 
-func handleTCP(conn net.Conn) error {
+func (c *Commander) handleTCP(conn net.Conn) {
+	var cbconn net.Conn
 	defer func() {
 		log.Printf("closing connection from %v now", conn.RemoteAddr())
 		conn.Close()
@@ -20,57 +21,81 @@ func handleTCP(conn net.Conn) error {
 	w := bufio.NewWriter(conn)
 	scanr := bufio.NewScanner(r)
 	for {
-		fmt.Println("scanning...")
 		scanned := scanr.Scan()
-		fmt.Println(scanned)
-		fmt.Println("scanned")
 		if !scanned {
 			if err := scanr.Err(); err != nil {
-				log.Printf("%v(%v)", err, conn.RemoteAddr())
-				return err
+				return
 			}
 			break
 		}
 		data := scanr.Text()
 		dataParts := strings.Split(data, ":")
-		if dataParts[0] == "handshake" {
+		switch dataParts[0] {
+		case "handshake":
 			callerId := dataParts[1]
-			w.WriteString(callerId + "\n")
-			w.Flush()
-		} else {
-			w.WriteString(strings.ToUpper(data) + "\n")
+			cbconn, _ = c.Call(callerId, "connected")
+			if cbconn != nil {
+				response := fmt.Sprintf("connected:%s\n", c.GetHSLink)
+				w.WriteString(response)
+			} else {
+				fmt.Println("CANT CONNECT BACK")
+				w.WriteString("\n")
+				w.Flush()
+			}
+		case "endCall":
+			if cbconn != nil {
+				cbconn.Close()	
+			}
+			return
+		default:
+			// received bytes transformed to audio
+			// 
+			// ******* transforming it *******
+			// 
+			// done, sending back amount of bytes received
+			fmt.Println("Answering...")
+			w.WriteString(fmt.Sprintf("%d\n", len(data)))
 			w.Flush()
 		}
 	}
-	return nil
+	return
 }
 
-func Call(callerId string) {
+func (c *Commander) SendBytes(conn net.Conn, input string) bool {
+	inputWithNewLine := fmt.Sprintf("%s\n", input)
+	toSend := []byte(inputWithNewLine)
+	_, err := conn.Write(toSend)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
+	var conn net.Conn
+	var err error
 	dailer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, &net.Dialer{})
 	if err != nil {
-		fmt.Println(err)
-		return
+		return conn, err
 	}
-	c, err := dailer.Dial("tcp", callerId)
+	conn, err = dailer.Dial("tcp", callerId)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return conn, err
 	}
-	fmt.Println("sending hello...")
-	_, err = c.Write([]byte("Hello\n"))
-	if err != nil {
-		println("Write to server failed:", err.Error())
-		return
+	if status == "call" {
+		toSend := fmt.Sprintf("handshake:%s\n", c.GetHSLink())
+		_, err = conn.Write([]byte(toSend))
+		if err != nil {
+			return conn, err
+		}
 	}
-	fmt.Println("reading reply")
-	reply := make([]byte, 1024)
-	_, err = c.Read(reply)
-	if err != nil {
-		println("Write to server failed:", err.Error())
-		return
-	}
-	println("reply from server=", string(reply))
-	c.Close()
+	return conn, nil
+}
+
+func (c *Commander) EndCall(conn net.Conn) {
+	c.SendBytes(conn, fmt.Sprintf("endCall:%s", c.GetHSLink()))
+	conn.Close()
+	return
 }
 
 func (c *Commander) RunTCPServer() {
@@ -87,6 +112,6 @@ func (c *Commander) RunTCPServer() {
 			continue
 		}
 		log.Printf("accepted connection from %v", conn.RemoteAddr())
-		handleTCP(conn)
+		c.handleTCP(conn)
 	}
 }
