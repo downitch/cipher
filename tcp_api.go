@@ -11,7 +11,8 @@ import(
 	"golang.org/x/net/proxy"
 )
 
-func (c *Commander) handleTCP(conn net.Conn, connection *net.Conn) {
+func (c *Commander) handleTCP(conn net.Conn, inc chan net.Conn) {
+	var cbconn net.Conn
 	defer func() {
 		log.Printf("closing connection from %v now", conn.RemoteAddr())
 		conn.Close()
@@ -33,17 +34,27 @@ func (c *Commander) handleTCP(conn net.Conn, connection *net.Conn) {
 		case "handshake":
 			callerId := dataParts[1]
 			callerIdWithPort := fmt.Sprintf("%s:88", callerId)
-			cbconn, _ := c.Call(callerIdWithPort, "connected")
-			connection = &cbconn
-			if connection != nil {
+			cbconn, err := c.Call(callerIdWithPort, "connected")
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			if cbconn != nil {
 				response := fmt.Sprintf("connected:%s\n", c.GetTCPHSLink())
 				w.WriteString(response)
+				w.Flush()
+				inc <- cbconn
 			} else {
 				fmt.Println("CANT CONNECT BACK")
 				w.WriteString("\n")
 				w.Flush()
+				inc <- nil
+				return
 			}
 		case "endCall":
+			if cbconn != nil {
+				cbconn.Close()
+			}
 			return
 		default:
 			// received bytes transformed to audio
@@ -51,6 +62,7 @@ func (c *Commander) handleTCP(conn net.Conn, connection *net.Conn) {
 			// ******* transforming it *******
 			// 
 			// done, sending back amount of bytes received
+			fmt.Println(data)
 			w.WriteString(fmt.Sprintf("%d\n", len(data)))
 			w.Flush()
 		}
@@ -99,7 +111,7 @@ func (c *Commander) EndCall(conn net.Conn) {
 }
 
 func (c *Commander) RunTCPServer() {
-	var connection net.Conn
+	incomingConnection := make(chan net.Conn)
 	// Here we define our TCP web-server that will be visible from darkweb
 	listener, err := net.Listen("tcp", ":4888")
 	if err != nil {
@@ -114,17 +126,15 @@ func (c *Commander) RunTCPServer() {
 				continue
 			}
 			log.Printf("accepted connection from %v", conn.RemoteAddr())
-			c.handleTCP(conn, &connection)
-			if connection != nil {
-				connection.Close()
-			}
+			c.handleTCP(conn, incomingConnection)
 		}
 	}()
 	for {
-		if connection != nil {
-			d := GenRandomString(128)
-			c.SendBytes(connection, d)
-			fmt.Println(d)
+		if connection := <- incomingConnection; connection != nil {
+			fmt.Println("HAHAHAHAHAHAH WORKS")
+			c.SendBytes(connection, "HAHAHAHAHAHAH WORKS")
+		} else {
+			fmt.Println("No connection")
 		}
 	}
 }
