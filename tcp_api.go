@@ -70,7 +70,8 @@ func (c *Commander) handleTCP(conn net.Conn, inc chan net.Conn) {
 	return
 }
 
-func (c *Commander) SendBytes(conn net.Conn, input string) bool {
+func (c *Commander) SendBytes(input string) bool {
+	conn := c.Connection
 	if conn == nil {
 		return false
 	}
@@ -104,9 +105,9 @@ func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
 	return conn, nil
 }
 
-func (c *Commander) EndCall(conn net.Conn) {
-	c.SendBytes(conn, fmt.Sprintf("endCall:%s", c.GetTCPHSLink()))
-	conn.Close()
+func (c *Commander) EndCall() {
+	c.SendBytes(fmt.Sprintf("endCall:%s", c.GetTCPHSLink()))
+	c.Connection.Close()
 	return
 }
 
@@ -131,10 +132,7 @@ func (c *Commander) RunTCPServer() {
 	}()
 	for {
 		if connection := <- incomingConnection; connection != nil {
-			fmt.Println("HAHAHAHAHAHAH WORKS")
-			c.SendBytes(connection, "HAHAHAHAHAHAH WORKS")
-		} else {
-			fmt.Println("No connection")
+			c.AcceptConnection(connection)	
 		}
 	}
 }
