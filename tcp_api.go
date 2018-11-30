@@ -6,7 +6,6 @@ import(
 	"net"
 	"log"
 	"strings"
-	// "time"
 
 	"golang.org/x/net/proxy"
 )
@@ -45,8 +44,8 @@ func (c *Commander) handleTCP(conn net.Conn, inc chan net.Conn) {
 				w.Flush()
 				inc <- cbconn
 			} else {
-				fmt.Println("CANT CONNECT BACK")
-				w.WriteString("\n")
+				response := fmt.Sprintf("errorConnecting:%s\n", c.GetTCPHSLink())
+				w.WriteString(response)
 				w.Flush()
 				inc <- nil
 				return
@@ -82,6 +81,12 @@ func (c *Commander) SendBytes(input string) bool {
 		return false
 	}
 	return true
+}
+
+func (c *Commander) ReadResponse() []byte {
+	var buff []byte
+	c.Connection.Read(buff)
+	return buff
 }
 
 func (c *Commander) Call(callerId string, status string) (net.Conn, error) {
