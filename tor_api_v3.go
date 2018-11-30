@@ -16,7 +16,6 @@ import (
 
 // This function should be fired everytime Tor Hidden Service is running
 func (c *Commander) ConfigureTorrc() error {
-	var chmoderror error
 	path := c.ConstantPath
 	// either creating a new file or writing to one that exists
 	tcpPath := fmt.Sprintf("%s/tcp", path)
@@ -33,16 +32,18 @@ func (c *Commander) ConfigureTorrc() error {
 		return err
 	}
 	// chmodding directory where application is running
+	correctPermission := int(0700)
 	switch runtime.GOOS {
 	case "windows":
-		chmoderror = os.Chmod(tcpPath, 0600)
-		chmoderror = os.Chmod(hsPath, 0600)
+		correctPermission = int(0600)
 	default:
-		chmoderror = os.Chmod(tcpPath, 0700)
-		chmoderror = os.Chmod(hsPath, 0700)
+		break
 	}
-	if chmoderror != nil {
-		return chmoderror
+	if _, err := os.Stat(tcpPath); os.IsNotExist(err) {
+   	os.Mkdir(hsPath, os.FileMode(correctPermission))
+	}
+	if _, err := os.Stat(hsPath); os.IsNotExist(err) {
+   	os.Mkdir(hsPath, os.FileMode(correctPermission))
 	}
 	return nil
 }
