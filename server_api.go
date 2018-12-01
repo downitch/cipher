@@ -7,8 +7,6 @@ import (
 	"strings"
 	"strconv"
 	"time"
-
-	// "github.com/stackimpact/stackimpact-go"
 )
 
 type ResponseJSON struct {
@@ -16,339 +14,204 @@ type ResponseJSON struct {
 	Err string `json:"err"`
 }
 
-var DEFAULT_ERROR = `{"res": "nil", "error": "can't convert struct to JSON"}`
+const DEFAULT_ERROR = `{"res": "nil", "error": "can't convert struct to JSON"}`
 
-var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) (string, error) {
-	call := strings.Join(request["call"], "")
-	switch call {
+var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) string {
+	switch strings.Join(request["call"], "") {
 	case "id":
-		id := c.GetHSLink()
-		return formResponse(id, ""), nil
+		return formResponse(c.GetHSLink(), "")
 	case "chats":
-		chatsStr := ""
-		var response []byte
-		chats := c.GetChats()
-		if len(chats) <= 0 {
-			return formResponse("", "no chats found"), nil
-		}
-		for c := range chats {
-			out, err := json.Marshal(chats[c])
-			if err != nil {
-				errResponse := fmt.Sprintf("can't parse chat #%d", c)
-				return formResponse("", errResponse), nil
-			}
-			chatsStr = fmt.Sprintf("%s%s,", chatsStr, string(out))
-		}
-		chatsStr = chatsStr[:len(chatsStr) - 1]
-		response = []byte(fmt.Sprintf(`{"res": [%s], "error": "nil"}`, chatsStr))
-		return string(response), nil
+		return c.FormChats()
 	case "send":
-		rec := strings.Join(request["recepient"], "")
-		cb := c.GetLinkByAddress(rec)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		msg := strings.Join(request["msg"], "")
-		emsg := c.CipherMessage(rec, msg)
-		tx, err := FormRawTxWithBlockchain(emsg, rec)
-		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		link := c.GetHSLink()
-		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "text", msg)
-		if id == 0 {
-			return formResponse("", "can't save message"), nil
-		}
-		go func() {
-			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx)
-			if err != nil {
-				fmt.Println("Request failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-			res := &ResponseJSON{}
-			err = json.Unmarshal([]byte(r), res)
-			if err != nil || res.Res != "ok" {
-				fmt.Println("Response parsing failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-		}()
-		return formResponse(tx, ""), nil
+		return c.SendMessageWithType(request, "text")
 	case "sysSend":
-		rec := strings.Join(request["recepient"], "")
-		cb := c.GetLinkByAddress(rec)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		msg := strings.Join(request["msg"], "")
-		emsg := c.CipherMessage(rec, msg)
-		tx, err := FormRawTxWithBlockchain(emsg, rec)
-		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		link := c.GetHSLink()
-		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "system", msg)
-		if id == 0 {
-			return formResponse("", "can't save message"), nil
-		}
-		go func() {
-			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=system")
-			if err != nil {
-				fmt.Println("Request failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-			res := &ResponseJSON{}
-			err = json.Unmarshal([]byte(r), res)
-			if err != nil || res.Res != "ok" {
-				fmt.Println("Response parsing failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-		}()
-		return formResponse(tx, ""), nil
+		return c.SendMessageWithType(request, "system")
 	case "fileSend":
-		rec := strings.Join(request["recepient"], "")
-		cb := c.GetLinkByAddress(rec)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		msg := strings.Join(request["msg"], "")
-		emsg := c.CipherMessage(rec, msg)
-		tx, err := FormRawTxWithBlockchain(emsg, rec)
-		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		link := c.GetHSLink()
-		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "file", msg)
-		if id == 0 {
-			return formResponse("", "can't save message"), nil
-		}
-		go func() {
-			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=file")
-			if err != nil {
-				fmt.Println("Request failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-			res := &ResponseJSON{}
-			err = json.Unmarshal([]byte(r), res)
-			if err != nil || res.Res != "ok" {
-				fmt.Println("Response parsing failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-		}()
-		return formResponse(tx, ""), nil
+		return c.SendMessageWithType(request, "file")
 	case "imageSend":
-		rec := strings.Join(request["recepient"], "")
-		cb := c.GetLinkByAddress(rec)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		msg := strings.Join(request["msg"], "")
-		emsg := c.CipherMessage(rec, msg)
-		tx, err := FormRawTxWithBlockchain(emsg, rec)
-		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		link := c.GetHSLink()
-		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "image", msg)
-		if id == 0 {
-			return formResponse("", "can't save message"), nil
-		}
-		go func() {
-			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=image")
-			if err != nil {
-				fmt.Println("Request failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-			res := &ResponseJSON{}
-			err = json.Unmarshal([]byte(r), res)
-			if err != nil || res.Res != "ok" {
-				fmt.Println("Response parsing failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-		}()
-		return formResponse(tx, ""), nil
+		return c.SendMessageWithType(request, "image")
 	case "audioSend":
-		rec := strings.Join(request["recepient"], "")
-		cb := c.GetLinkByAddress(rec)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		msg := strings.Join(request["msg"], "")
-		emsg := c.CipherMessage(rec, msg)
-		tx, err := FormRawTxWithBlockchain(emsg, rec)
-		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		link := c.GetHSLink()
-		a := c.GetSelfAddress()
-		id := c.SaveMessage(a, rec, "audio", msg)
-		if id == 0 {
-			return formResponse("", "can't save message"), nil
-		}
-		go func() {
-			r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=audio")
-			if err != nil {
-				fmt.Println("Request failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-			res := &ResponseJSON{}
-			err = json.Unmarshal([]byte(r), res)
-			if err != nil || res.Res != "ok" {
-				fmt.Println("Response parsing failed, failing message")
-				fmt.Println(err)
-				fmt.Println("_______________________________")
-				c.UpdateFailedMessage(id, rec)
-			}
-		}()
-		return formResponse(tx, ""), nil
+		return c.SendMessageWithType(request, "audio")
 	case "resend":
+		return c.SendMessageWithType(request, "")
+	case "inbox":
+		return c.ProcessInbox(request)
+	case "inboxFired":
+		address := strings.Join(request["address"], "")
+		c.UpdateSentMessages(address)
+		return formResponse("ok", "")
+	case "notify":
+		return c.ProcessNotification(request)
+	case "greeting":
+		return c.InitiateGreeting(request)
+	case "greetingOk":
+		return c.ProcessGreeting(request)
+	default:
+		return formResponse("", "unrecognized call")
+	}
+}
+
+func (c *Commander) RunRealServer() {
+	// Here we define our HTTP web-server that will be visible from darkweb
+	server := &http.Server {
+		Addr: ":4887",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(DEFAULT_HANDLER(r.URL.Query(), c)))
+		}),
+	}
+	server.ListenAndServe()
+}
+
+func (c *Commander) FormChats() string {
+	chatsStr := ""
+	chats := c.GetChats()
+	if len(chats) <= 0 {
+		return formResponse("", "no chats found")
+	}
+	for i := range chats {
+		out, _ := json.Marshal(chats[i])
+		chatsStr = fmt.Sprintf("%s%s,", chatsStr, string(out))
+	}
+	chatsStr = chatsStr[:len(chatsStr) - 1]
+	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, chatsStr)
+}
+
+func (c *Commander) SendMessageWithType(request map[string][]string, t string) string {
+	var msg string
+	var id int
+	rec := strings.Join(request["recepient"], "")
+	mid := strings.Join(request["id"], "")
+	cb := c.GetLinkByAddress(rec)
+	link := c.GetHSLink()
+	if cb == "" {
+		return formResponse("", "transaction didn't happen")
+	}
+	if mid == "" {
+		msg = strings.Join(request["msg"], "")
+		a := c.GetSelfAddress()
+		id = c.SaveMessage(a, rec, t, msg)
+		if id == 0 {
+			return formResponse("", "can't save message")
+		}
+	} else {
+		id, _ = strconv.Atoi(mid)
 		addr := strings.Join(request["address"], "")
-		iid := strings.Join(request["id"], "")
-		id, _ := strconv.Atoi(iid)
-		msg := c.GetMessageById(addr, id)
-		emsg := c.CipherMessage(addr, msg.Text)
-		tx, err := FormRawTxWithBlockchain(emsg, addr)
+		message := c.GetMessageById(addr, id)
+		msg = message.Text
+		t = message.Type
+	}
+	emsg := c.CipherMessage(rec, msg)
+	tx, err := FormRawTxWithBlockchain(emsg, rec)
+	if err != nil {
+		return formResponse("", "can't form transaction")
+	}
+	go func() {
+		uri := fmt.Sprintf("%s/?call=notify&callback=%s&tx=%s&type=%s", cb, link, tx, t)
+		r, err := Request(uri)
 		if err != nil {
-			return formResponse("", "can't form transaction"), nil
-		}
-		cb := c.GetLinkByAddress(addr)
-		if cb == "" {
-			return formResponse("", "transaction didn't happen"), nil
-		}
-		link := c.GetHSLink()
-		c.UpdateUnfailMessage(id, addr)
-		r, err := Request(cb + "/?call=notify&callback=" + link + "&tx=" + tx + "&type=" + msg.Type)
-		if err != nil {
-			c.UpdateFailedMessage(id, addr)
-			return formResponse("", "user is offline"), nil
+			c.UpdateFailedMessage(id, rec)
 		}
 		res := &ResponseJSON{}
 		err = json.Unmarshal([]byte(r), res)
 		if err != nil || res.Res != "ok" {
-			c.UpdateFailedMessage(id, addr)
-			return formResponse("", "recepient can't save message"), nil
+			c.UpdateFailedMessage(id, rec)
 		}
-		return formResponse(tx, ""), nil
-	case "inbox":
-		response := "nil"
-		addr := strings.Join(request["address"], "")
-		messages, err := c.GetChatHistory(addr)
-		if err != nil {
-			return `{"res": [], "error": "can't get messages"}`, nil
-		}
-		if len(messages) != 0 {
-			response = ""
-			for m := range messages {
-				out, err := json.Marshal(messages[m])
-				if err != nil {
-					response = fmt.Sprintf(`{"res": [],
-						"error": "can't parse message #%d"}`, m)
-					return response, nil
-				}
-				response = fmt.Sprintf("%s%s,", response, string(out))
-			}
-			response = response[:len(response) - 1]
-		}
-		if response == "nil" {
-			return `{"res": [], "error": "nil"}`, nil
-		}
-		go func() {
-			l := c.GetLinkByAddress(addr)
-			a := c.GetSelfAddress()
-			RequestWithTimeout(fmt.Sprintf("%s/?call=inboxFired&address=%s", l, a))
-		}()
-		return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response), nil
-	case "inboxFired":
-		addr := strings.Join(request["address"], "")
-		c.UpdateSentMessages(addr)
-		return formResponse("ok", ""), nil
-	case "balanceOf":
-		addr := strings.Join(request["address"], "")
-		balance := GetBalance(addr)
-		return formResponse(balance, ""), nil
-	case "notify":
-		cb := strings.Join(request["callback"], "")
-		t := strings.Join(request["type"], "")
-		if t == "" {
-			t = "text"
-		}
-		addr := c.GetAddressByLink(cb)
-		if addr == "" {
-			return formResponse("", "no such user found"), nil
-		}
-		tx := strings.Join(request["tx"], "")
-		trimmedTx := strings.Split(tx, "x")[1]
-		decodedTx, err := DecodeRawTx(trimmedTx)
-		if err != nil {
-			return formResponse("", "can't decode tx"), nil
-		}
-		res := c.DecipherMessage(addr, decodedTx)
-		m := fmt.Sprintf("%s", res)
-		saved := c.SaveMessage(addr, addr, t, m)
-		if saved > 0 {
-			go func(c *Commander, addr string) {
-				time.Sleep(time.Second * 5)
-				c.UpdatedSelfNewMessages(addr)
-			}(c, addr)
-			return formResponse("ok", ""), nil
-		}
-		return formResponse("", "can't save message"), nil
-	case "greeting":
-		cb := strings.Join(request["callback"], "")
-		cb = fmt.Sprintf("%s.onion", cb)
-		if existance := c.CheckExistance(cb); existance != false {
-			return formResponse("", "already connected"), nil
-		}
-		cipher := GenRandomString(32)
-		hexedCipher := Hexify(cipher)
-		link := strings.Split(c.GetHSLink(), ".")[0]
-		selfAddr := c.GetSelfAddress()
-		formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=%s&address=%s&cipher=%s`, cb, link, selfAddr, hexedCipher)
-		fmt.Println(formattedUrl)
-		response, err := Request(formattedUrl)
-		if err != nil {
-			return formResponse("", err.Error()), nil
-		}
-		r := &ResponseJSON{}
-		if err = json.Unmarshal([]byte(response), r); err != nil {
-			return formResponse("", "can't parse response"), nil
-		}
-		if err = c.AddNewUser(&NewUser{cb, r.Res, hexedCipher}); err != nil {
-			return formResponse("", "can't save user"), nil
-		}
-		return formResponse("ok", ""), nil
-	case "greetingOk":
-		addr := strings.Join(request["address"], "")
-		cb := fmt.Sprintf("%s.onion", strings.Join(request["callback"], ""))
-		cipher := strings.Join(request["cipher"], "")
-		if err := c.AddNewUser(&NewUser{cb, addr, cipher}); err != nil {
-			return formResponse("", "can't save user"), nil
-		}
-		return formResponse(c.GetSelfAddress(), ""), nil
-	default:
-		return formResponse("", "unrecognized call"), nil
+	}()
+	return formResponse(tx, "")
+}
+
+func (c *Commander) ProcessInbox(request map[string][]string) string {
+	var msgs []NewMessage
+	var response string
+	var out []byte
+	var err error
+	address := strings.Join(request["address"], "")
+	if msgs, err = c.GetChatHistory(address); err != nil || len(msgs) == 0 {
+		return `{"res": [], "error": "can't get messages"}`
 	}
+	for i := range msgs {
+		if out, err = json.Marshal(msgs[i]); err != nil {
+			return `{"res": [], "error": "can't parse message"}`
+		}
+		response = fmt.Sprintf("%s%s,", response, string(out))
+	}
+	response = response[:len(response) - 1]
+	go func() {
+		l := c.GetLinkByAddress(address)
+		a := c.GetSelfAddress()
+		uri := fmt.Sprintf("%s/?call=inboxFired&address=%s", l, a)
+		Request(uri)
+	}()
+	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
+}
+
+func (c *Commander) ProcessNotification(request map[string][]string) string {
+	var t string
+	var address string
+	cb := strings.Join(request["callback"], "")
+	if t = strings.Join(request["type"], ""); t == "" {
+		t = "text"
+	}
+	if address = c.GetAddressByLink(cb); address == "" {
+		return formResponse("", "no such user found")
+	}
+	tx := strings.Join(request["tx"], "")
+	trimmedTx := strings.Split(tx, "x")[1]
+	decodedTx, err := DecodeRawTx(trimmedTx)
+	if err != nil {
+		return formResponse("", "can't decode tx")
+	}
+	m := string(c.DecipherMessage(address, decodedTx))
+	if saved := c.SaveMessage(address, address, t, m); saved == 0 {
+		return formResponse("", "can't save message")
+	}
+	go func(c *Commander, address string) {
+		time.Sleep(time.Second * 5)
+		c.UpdatedSelfNewMessages(address)
+	}(c, address)
+	return formResponse("ok", "")
+}
+
+func (c *Commander) InitiateGreeting(request map[string][]string) string {
+	callback := strings.Join(request["callback"], "")
+	cb := fmt.Sprintf("%s.onion", callback)
+	if existance := c.CheckExistance(cb); existance != false {
+		return formResponse("", "already connected")
+	}
+	cipher := GenRandomString(32)
+	hexedCipher := Hexify(cipher)
+	link := strings.Split(c.GetHSLink(), ".")[0]
+	selfAddr := c.GetSelfAddress()
+	formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=
+	%s&address=%s&cipher=%s`, cb, link, selfAddr, hexedCipher)
+	response, err := Request(formattedUrl)
+	if err != nil {
+		return formResponse("", err.Error())
+	}
+	r := &ResponseJSON{}
+	if err = json.Unmarshal([]byte(response), r); err != nil {
+		return formResponse("", "can't parse response")
+	}
+	if err = c.AddNewUser(&NewUser{cb, r.Res, hexedCipher}); err != nil {
+		return formResponse("", "can't save user")
+	}
+	return formResponse("ok", "")
+}
+
+func (c *Commander) ProcessGreeting(request map[string][]string) string {
+	addr     := strings.Join(request["address"], "")
+	callback := strings.Join(request["callback"], "")
+	cipher   := strings.Join(request["cipher"], "")
+	cb       := fmt.Sprintf("%s.onion", callback)
+	newUser  := &NewUser{
+		cb,
+		addr,
+		cipher,
+	}
+	if err := c.AddNewUser(newUser); err != nil {
+		return formResponse("", "can't save user")
+	}
+	return formResponse(c.GetSelfAddress(), "")
 }
 
 func formResponse(response string, err string) string {
@@ -374,20 +237,4 @@ func formResponse(response string, err string) string {
 		}
 	}
 	return string(responseStructStringified)
-}
-
-func (c *Commander) RunRealServer() {
-	// stackimpact.Start(stackimpact.Options{
-	//   AgentKey: "058d0f9bfc13ffc3ab893174159224c87f8c0c4e",
-	//   AppName: "MyGoApp"})
-
-	// Here we define our HTTP web-server that will be visible from darkweb
-	server := &http.Server {
-		Addr: ":4887",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response, _ := DEFAULT_HANDLER(r.URL.Query(), c)
-			// sending back the response as web-server answer
-			w.Write([]byte(response))
-		})}
-	server.ListenAndServe()
 }

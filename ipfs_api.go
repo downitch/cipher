@@ -36,12 +36,14 @@ func (c *Commander) AddFileToIPFS(filepath string) string {
 	bodyWriter := multipart.NewWriter(bodyBuf)
 	fileWriter, err := bodyWriter.CreateFormFile("uploadfile", filename)
 	if err != nil {
+		fmt.Println("GOLANG")
 		fmt.Println("error writing to buffer")
 		fmt.Println(err)
 		return ""
 	}
 	fh, err := os.Open(filepath)
 	if err != nil {
+		fmt.Println("GOLANG")
 		fmt.Println("error opening file")
 		fmt.Println(err)
 		return ""
@@ -49,20 +51,23 @@ func (c *Commander) AddFileToIPFS(filepath string) string {
 	defer fh.Close()
 	_, err = io.Copy(fileWriter, fh)
 	if err != nil {
+		fmt.Println("GOLANG")
 		fmt.Println(err)
 		return ""
 	}
 	contentType := bodyWriter.FormDataContentType()
 	bodyWriter.Close()
-	os.Remove(filepath)
+	// os.Remove(filepath)
 	data, err := RequestPostHTTPS(URLAdd, contentType, bodyBuf)
 	if err != nil {
+		fmt.Println("GOLANG")
 		fmt.Println(err)
 		return ""
 	}
 	response := &ipfsResponse{}
 	err = json.Unmarshal([]byte(data), response)
 	if err != nil {
+		fmt.Println("GOLANG")
 		fmt.Println(err)
 		return ""
 	}

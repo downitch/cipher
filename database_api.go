@@ -77,10 +77,6 @@ func (c *Commander) AddTableColumn(tname string, cname string, ctype string, dva
 }
 
 func (c *Commander) UpdateStorage() bool {
-	// path := c.ConstantPath + "/history/"
-	// if _, err := os.Stat(); os.IsNotExist(err) {
-
-	// }
 	db, err := c.openDB("history")
 	if err != nil {
 		return false
@@ -93,7 +89,6 @@ func (c *Commander) UpdateStorage() bool {
 	hash text);`
 	_, err = db.Exec(stmnt)
 	if err != nil {
-		// fmt.Println(err)
 		closeDB(db)
 		return false
 	}
@@ -116,13 +111,26 @@ func (c *Commander) UpdateStorage() bool {
 }
 
 func (c *Commander) openDB(name string) (*sql.DB, error) {
-	path := c.ConstantPath
-	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
-	db, err := sql.Open("sqlite3", fullPath)
-	if err != nil {
-		return &sql.DB{}, err
+	db   := &sql.DB{}
+	var err error
+	if c.DbFilename != name {
+		path := c.ConstantPath
+		fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
+		db, err = sql.Open("sqlite3", fullPath)
+		if err != nil {
+			return &sql.DB{}, err
+		}
 	}
-	return db, nil
+	if c.DbConnection == nil {
+		path := c.ConstantPath
+		fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
+		db, err = sql.Open("sqlite3", fullPath)
+		if err != nil {
+			return &sql.DB{}, err
+		}
+	}
+	c.SetDatabaseConnection(name, db)
+	return c.DbConnection, nil
 }
 
 func closeDB(db *sql.DB) bool {
@@ -193,14 +201,14 @@ func (c *Commander) GetCipherByAddress(address string) string {
 func (c *Commander) CheckExistance(link string) bool {
 	db, err := c.openDB("history")
 	if err != nil {
-		// fmt.Println("cant open db")
+		
 		return true
 	}
 	defer closeDB(db)
 	stmnt := "select address from knownUsers where link = ?"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
-		// fmt.Println(err)
+		
 		return true
 	}
 	defer st.Close()
@@ -216,15 +224,13 @@ func (c *Commander) GetChats() []User {
 	var users []User
 	db, err := c.openDB("history")
 	if err != nil {
-		// fmt.Println(err)
+		
 		return []User{}
 	}
 	defer closeDB(db)
 	stmnt := `select username, link, address from knownUsers;`
 	rows, err := db.Query(stmnt)
 	if err != nil {
-		// fmt.Println("Error on query from knownUsers")
-		// fmt.Println(err)
 		return []User{}
 	}
 	defer rows.Close()
@@ -234,20 +240,14 @@ func (c *Commander) GetChats() []User {
 		var address string
 		err = rows.Scan(&username, &link, &address)
 		if err != nil {
-			// fmt.Println("error on Scanning row")
-			// fmt.Println(err)
 			return []User{}
 		}
 		lastMsg, err := c.GetLastMessage(address)
 		if err != nil {
-			// fmt.Println("error getting last message")
-			// fmt.Println(err)
 			return []User{}
 		}
 		newMsgs, err := c.GetNewMessages(address)
 		if err != nil {
-			// fmt.Println("error getting amount of self messages")
-			// fmt.Println(err)
 			return []User{}
 		}
 		notifications := c.GetNotifications(address)
@@ -261,12 +261,11 @@ func (c *Commander) GetChats() []User {
 				lastMsg,
 				newMsgsStringified,
 				notifications,
-				lastOnline})
+				lastOnline,
+			})
 	}
 	err = rows.Err()
 	if err != nil {
-		// fmt.Println("error at checking rows error")
-		// fmt.Println(err)
 		return []User{}
 	}
 	return users
@@ -358,7 +357,7 @@ func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
 		return NewMessage{}, nil
 	}
 	msg = NewMessage{id, origin, date, status, sender, input, pinned}
-	// fmt.Println(msg)
+	
 	return msg, nil
 }
 
@@ -426,18 +425,18 @@ func (c *Commander) GetNewMessages(addr string) (int, error) {
 	stmnt := `select id from messages where status = ? or status = ?;`
 	rows, err := db.Query(stmnt, "self", "new")
 	if err != nil {
-		// fmt.Println(err)
+		
 		return 0, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		amount = amount + 1
-		// fmt.Println(amount)
+		
 	}
 	err = rows.Err()
 	if err != nil {
-		// fmt.Println("KEK")
-		// fmt.Println(err)
+		
+		
 		return 0, err
 	}
 	return amount, nil
@@ -480,7 +479,6 @@ func (c *Commander) UpdateSelfMessages(address string) {
 	stmnt := `update messages set status = ? where status = ?;`
 	_, err = db.Exec(stmnt, "down", "self")
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -495,7 +493,6 @@ func (c *Commander) UpdatedSelfNewMessages(address string) {
 	stmnt := `update messages set status = ? where status = ?;`
 	_, err = db.Exec(stmnt, "self", "new")
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -510,7 +507,6 @@ func (c *Commander) UpdateSentMessages(address string) {
 	stmnt := `update messages set status = ? where status = ?;`
 	_, err = db.Exec(stmnt, "read", "sent")
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -525,7 +521,6 @@ func (c *Commander) UpdateFailedMessage(id int, address string) {
 	stmnt := `update messages set status = ? where id = ?;`
 	_, err = db.Exec(stmnt, "failed", id)
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -540,7 +535,6 @@ func (c *Commander) UpdateUnfailMessage(id int, address string) {
 	stmnt := `update messages set status = ? where id = ?;`
 	_, err = db.Exec(stmnt, "sent", id)
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -555,7 +549,6 @@ func (c *Commander) UpdateUnreadMessage(id int, address string) {
 	stmnt := `update messages set status = ? where id = ?;`
 	_, err = db.Exec(stmnt, "unread", id)
 	if err != nil {
-		// fmt.Println(err)
 		return
 	}
 	return
@@ -597,14 +590,12 @@ func(c *Commander) SaveBlock(hash string, number int) error {
 func (c *Commander) GetRandomBlockFromDB() RandomBlock {
 	db, err := c.openDB("blocks")
 	if err != nil {
-		fmt.Println(err)
 		return RandomBlock{}
 	}
 	defer closeDB(db)
 	stmnt := "select id, hash, number from blocks where id >= (abs(random()) % (SELECT max(id) FROM blocks)) limit 1"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
-		fmt.Println(err)
 		return RandomBlock{}
 	}
 	var id int
@@ -612,14 +603,12 @@ func (c *Commander) GetRandomBlockFromDB() RandomBlock {
 	var number int
 	err = st.QueryRow().Scan(&id, &hash, &number)
 	if err != nil {
-		fmt.Println(err)
 		return RandomBlock{}
 	}
 	st.Close()
 	stmnt = fmt.Sprintf(`delete from blocks where id = '%d'`, id)
 	_, err = db.Exec(stmnt)
 	if err != nil {
-		fmt.Println(err)
 		return RandomBlock{}
 	}
 	return RandomBlock{hash, number}
@@ -700,21 +689,18 @@ func (c *Commander) DeleteContact(link string) bool {
 func (c *Commander) GetPinnedMessage(addr string) int {
 	db, err := c.openDB(addr)
 	if err != nil {
-		fmt.Println(err)
 		return 0
 	}
 	defer closeDB(db)
 	stmnt := "select id from messages where pinned = ?"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
-		fmt.Println(err)
 		return 0
 	}
 	defer st.Close()
 	var mid int
 	err = st.QueryRow("true").Scan(&mid)
 	if err != nil {
-		fmt.Println(err)
 		return 0
 	}
 	return mid
@@ -723,14 +709,12 @@ func (c *Commander) GetPinnedMessage(addr string) int {
 func (c *Commander) PinMessage(addr string, mid int) {
 	db, err := c.openDB(addr)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 	defer closeDB(db)
 	stmnt := "select id from messages where pinned = ?"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 	defer st.Close()
@@ -740,7 +724,7 @@ func (c *Commander) PinMessage(addr string, mid int) {
 		stmnt = "update messages set pinned = ? where id = ?"
 		_, err = db.Exec(stmnt, "true", mid)
 		if err != nil {
-			fmt.Println(err)
+			
 		}
 		return
 	}
@@ -750,7 +734,6 @@ func (c *Commander) PinMessage(addr string, mid int) {
 	stmnt = "update messages set pinned = ? where id = ?"
 	_, err = db.Exec(stmnt, "true", mid)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 	return
@@ -759,15 +742,11 @@ func (c *Commander) PinMessage(addr string, mid int) {
 func (c *Commander) UnpinMessage(addr string) {
 	db, err := c.openDB(addr)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 	defer closeDB(db)
 	stmnt := "update messages set pinned = ?"
-	_, err = db.Exec(stmnt, "false")
-	if err != nil {
-		fmt.Println(err)
-	}
+	db.Exec(stmnt, "false")
 	return
 }
 
@@ -798,8 +777,6 @@ func (c *Commander) SaveMessage(addr string, rec string, mtype string, msg strin
 		'false');`, mtype, date, status, addr, msg)
 	_, err = db.Exec(stmnt)
 	if err != nil {
-		// fmt.Println("Statement broken")
-		// fmt.Println(err)
 		return 0
 	}
 	id := c.GetLastMessageId(rec)
