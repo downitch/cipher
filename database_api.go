@@ -111,26 +111,33 @@ func (c *Commander) UpdateStorage() bool {
 }
 
 func (c *Commander) openDB(name string) (*sql.DB, error) {
-	db   := &sql.DB{}
-	var err error
-	if c.DbFilename != name {
-		path := c.ConstantPath
-		fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
-		db, err = sql.Open("sqlite3", fullPath)
-		if err != nil {
-			return &sql.DB{}, err
-		}
+	// db := c.DbConnection
+	// var err error
+	// if c.DbFilename != name {
+	// 	path := c.ConstantPath
+	// 	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
+	// 	db, err = sql.Open("sqlite3", fullPath)
+	// 	if err != nil {
+	// 		return &sql.DB{}, err
+	// 	}
+	// }
+	// if c.DbConnection == nil {
+	// 	path := c.ConstantPath
+	// 	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
+	// 	db, err = sql.Open("sqlite3", fullPath)
+	// 	if err != nil {
+	// 		return &sql.DB{}, err
+	// 	}
+	// }
+	// c.SetDatabaseConnection(name, db)
+	// return db, nil
+	path := c.ConstantPath
+	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
+	db, err := sql.Open("sqlite3", fullPath)
+	if err != nil {
+		return &sql.DB{}, err
 	}
-	if c.DbConnection == nil {
-		path := c.ConstantPath
-		fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
-		db, err = sql.Open("sqlite3", fullPath)
-		if err != nil {
-			return &sql.DB{}, err
-		}
-	}
-	c.SetDatabaseConnection(name, db)
-	return c.DbConnection, nil
+	return db, nil
 }
 
 func closeDB(db *sql.DB) bool {
@@ -357,7 +364,6 @@ func (c *Commander) GetLastMessage(addr string) (NewMessage, error) {
 		return NewMessage{}, nil
 	}
 	msg = NewMessage{id, origin, date, status, sender, input, pinned}
-	
 	return msg, nil
 }
 
@@ -431,12 +437,9 @@ func (c *Commander) GetNewMessages(addr string) (int, error) {
 	defer rows.Close()
 	for rows.Next() {
 		amount = amount + 1
-		
 	}
 	err = rows.Err()
 	if err != nil {
-		
-		
 		return 0, err
 	}
 	return amount, nil
@@ -477,10 +480,7 @@ func (c *Commander) UpdateSelfMessages(address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where status = ?;`
-	_, err = db.Exec(stmnt, "down", "self")
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "down", "self")
 	return
 }
 
@@ -491,10 +491,7 @@ func (c *Commander) UpdatedSelfNewMessages(address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where status = ?;`
-	_, err = db.Exec(stmnt, "self", "new")
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "self", "new")
 	return
 }
 
@@ -505,10 +502,7 @@ func (c *Commander) UpdateSentMessages(address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where status = ?;`
-	_, err = db.Exec(stmnt, "read", "sent")
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "read", "sent")
 	return
 }
 
@@ -519,10 +513,7 @@ func (c *Commander) UpdateFailedMessage(id int, address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where id = ?;`
-	_, err = db.Exec(stmnt, "failed", id)
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "failed", id)
 	return
 }
 
@@ -533,10 +524,7 @@ func (c *Commander) UpdateUnfailMessage(id int, address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where id = ?;`
-	_, err = db.Exec(stmnt, "sent", id)
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "sent", id)
 	return
 }
 
@@ -547,10 +535,7 @@ func (c *Commander) UpdateUnreadMessage(id int, address string) {
 	}
 	defer closeDB(db)
 	stmnt := `update messages set status = ? where id = ?;`
-	_, err = db.Exec(stmnt, "unread", id)
-	if err != nil {
-		return
-	}
+	db.Exec(stmnt, "unread", id)
 	return
 }
 
