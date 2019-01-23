@@ -134,7 +134,6 @@ func (c *Commander) DecipherMessage(receiver string, msg []byte) []byte {
 	split := strings.Split(strMsg, " 42 58 42 ")
 	num := BytifyString(split[0])
 	msg = BytifyString(split[1])
-	// realPath := c.ConstantPath + "/history/history"
 	// parsing our database to get correct cipher from there
 	constCipher := c.GetCipherByAddress(receiver)
 	decodedCipher, _ := Dehexify(constCipher)

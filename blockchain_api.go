@@ -150,6 +150,18 @@ func FormRawTxWithBlockchain(msg []byte, recepient string) (string, error) {
  	return result, nil
 }
 
+func FormRawAccoutBlockchain() ([]byte, error) {
+	// parsing private key's ECDSA from hex string
+	key := GenRandomString(32)
+	hexedKey := Hexify(key)
+	privateKey, err := crypto.HexToECDSA(hexedKey)
+	if err != nil {
+		return []byte{}, err
+	}
+	b := crypto.FromECDSA(privateKey)
+	return b, nil
+}
+
 // This function parses transaction and returns data field as
 // a result. It is neccessary, because messages are sent via tx
 func DecodeRawTx(rawTx string) ([]byte, error) {

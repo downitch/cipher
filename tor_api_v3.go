@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
+	// "runtime"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -33,12 +33,12 @@ func (c *Commander) ConfigureTorrc() error {
 	}
 	// chmodding directory where application is running
 	correctPermission := int(0700)
-	switch runtime.GOOS {
-	case "windows":
-		correctPermission = int(0600)
-	default:
-		break
-	}
+	// switch runtime.GOOS {
+	// case "windows":
+	// 	correctPermission = int(0600)
+	// default:
+	// 	break
+	// }
 	if _, err := os.Stat(tcpPath); os.IsNotExist(err) {
    	os.Mkdir(hsPath, os.FileMode(correctPermission))
 	}
@@ -191,15 +191,15 @@ func RequestWithTimeout(url string) (string, error) {
 
 // This function is highly experimental, because windows is kinda weird
 func (c *Commander) RunTorAndHS() {
-	switch runtime.GOOS {
-	case "windows":
-		return
-	default:
-		command := "cd "+c.ConstantPath+" && ./tor --hush -f "+c.ConstantPath+"/torrc"
-		out, err := exec.Command("sh", "-c", command).Output()
-		if err != nil {
-			fmt.Printf(err.Error())
-		}
-		fmt.Printf("%s\n", out)
+	// switch runtime.GOOS {
+	// case "windows":
+	// 	return
+	// default:
+	command := "cd "+c.ConstantPath+" && ./tor --hush -f "+c.ConstantPath+"/torrc"
+	out, err := exec.Command("sh", "-c", command).Output()
+	if err != nil {
+		fmt.Printf(err.Error())
 	}
+	fmt.Printf("%s\n", out)
+	// }
 }

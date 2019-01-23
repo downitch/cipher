@@ -20,16 +20,6 @@ type NewMessage struct {
 	Pinned   string `json:"pinned"`
 }
 
-type Status string
-
-const(
-	Sent   Status = "sent"
-	Read   Status = "read"
-	Fail   Status = "fail"
-	Unread Status = "unread"
-	New    Status = "new"
-)
-
 type NewUser struct {
 	Link string
 	Addr string
@@ -111,26 +101,6 @@ func (c *Commander) UpdateStorage() bool {
 }
 
 func (c *Commander) openDB(name string) (*sql.DB, error) {
-	// db := c.DbConnection
-	// var err error
-	// if c.DbFilename != name {
-	// 	path := c.ConstantPath
-	// 	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
-	// 	db, err = sql.Open("sqlite3", fullPath)
-	// 	if err != nil {
-	// 		return &sql.DB{}, err
-	// 	}
-	// }
-	// if c.DbConnection == nil {
-	// 	path := c.ConstantPath
-	// 	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
-	// 	db, err = sql.Open("sqlite3", fullPath)
-	// 	if err != nil {
-	// 		return &sql.DB{}, err
-	// 	}
-	// }
-	// c.SetDatabaseConnection(name, db)
-	// return db, nil
 	path := c.ConstantPath
 	fullPath := fmt.Sprintf("%s/history/%s.db", path, name)
 	db, err := sql.Open("sqlite3", fullPath)
@@ -278,19 +248,44 @@ func (c *Commander) GetChats() []User {
 	return users
 }
 
-func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
+func (c *Commander) GetFullChatHistory(addr string) ([]NewMessage, error) {
 	var messages []NewMessage
 	db, err := c.openDB(addr)
 	if err != nil {
 		return []NewMessage{}, err
 	}
 	defer closeDB(db)
-	stmnt := `select id, origin, date, status, sender, input, pinned from messages;`
+	if c.OldMessagesCount < 0 {
+		var amount int
+		stmnt := "select coalesce(max(id)+1, 0) from messages;"
+		rows, err := db.Query(stmnt)
+		if err != nil {
+			return []NewMessage{}, err
+		}
+		for rows.Next() {
+			err = rows.Scan(&amount)
+			if err != nil {
+				fmt.Println(err)
+				rows.Close()
+				return []NewMessage{}, err
+			}
+			c.SetMessageCount(amount - 1)
+			c.SetOldMessageCount(amount - 1)
+		}
+		err = rows.Err()
+		if err != nil {
+			fmt.Println(err)
+			rows.Close()
+			return []NewMessage{}, err
+		}
+		rows.Close()
+	}
+	stmnt := "select id, origin, date, status, sender, input, pinned from messages;"
 	rows, err := db.Query(stmnt)
 	if err != nil {
+		fmt.Println(err)
 		return []NewMessage{}, err
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var id string
 		var origin string
@@ -301,14 +296,155 @@ func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
 		var pinned string
 		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
 		if err != nil {
+			fmt.Println(err)
+			rows.Close()
 			return []NewMessage{}, err
 		}
 		messages = append(messages, NewMessage{id, origin, date, status, sender, input, pinned})
 	}
 	err = rows.Err()
 	if err != nil {
+		fmt.Println(err)
+		rows.Close()
 		return []NewMessage{}, err
 	}
+	rows.Close()
+	c.SetOldMessageCount(c.OldMessagesCount - 15)
+	return messages, nil
+}
+
+func (c *Commander) GetChatHistory(addr string) ([]NewMessage, error) {
+	if c.OldMessagesCount < 0 {
+		return []NewMessage{}, nil
+	}
+	var messages []NewMessage
+	db, err := c.openDB(addr)
+	if err != nil {
+		return []NewMessage{}, err
+	}
+	defer closeDB(db)
+	if !c.OldMessagesObsrvr {
+		var amount int
+		stmnt := "select coalesce(max(id)+1, 0) from messages;"
+		rows, err := db.Query(stmnt)
+		if err != nil {
+			return []NewMessage{}, err
+		}
+		for rows.Next() {
+			err = rows.Scan(&amount)
+			if err != nil {
+				fmt.Println(err)
+				rows.Close()
+				return []NewMessage{}, err
+			}
+			c.SetMessageCount(amount - 1)
+			c.SetOldMessageCount(amount - 1)
+		}
+		err = rows.Err()
+		if err != nil {
+			fmt.Println(err)
+			rows.Close()
+			return []NewMessage{}, err
+		}
+		rows.Close()
+		c.StartObserving()
+	}
+	stmnt := "select id, origin, date, status, sender, input, pinned from messages limit ? offset ?;"
+	amnt := 15
+	offset := c.OldMessagesCount - 15
+	if offset < 0 {
+		amnt += offset
+		offset = 0
+	}
+	rows, err := db.Query(stmnt, amnt, offset)
+	if err != nil {
+		fmt.Println(err)
+		return []NewMessage{}, err
+	}
+	for rows.Next() {
+		var id string
+		var origin string
+		var date string
+		var status string
+		var sender string
+		var input string
+		var pinned string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
+		if err != nil {
+			fmt.Println(err)
+			rows.Close()
+			return []NewMessage{}, err
+		}
+		messages = append(messages, NewMessage{id, origin, date, status, sender, input, pinned})
+	}
+	err = rows.Err()
+	if err != nil {
+		fmt.Println(err)
+		rows.Close()
+		return []NewMessage{}, err
+	}
+	rows.Close()
+	c.SetOldMessageCount(c.OldMessagesCount - 15)
+	return messages, nil
+}
+
+func (c *Commander) GetLatestMessages(addr string) ([]NewMessage, error) {
+	if c.MessagesCount == 0 {
+		return []NewMessage{}, nil
+	}
+	var messages []NewMessage
+	db, err := c.openDB(addr)
+	if err != nil {
+		return []NewMessage{}, err
+	}
+	defer closeDB(db)
+	stmnt := "select id, origin, date, status, sender, input, pinned from messages limit -1 offset ?;"
+	rows, err := db.Query(stmnt, c.MessagesCount)
+	if err != nil {
+		fmt.Println(err)
+		return []NewMessage{}, err
+	}
+	for rows.Next() {
+		var id string
+		var origin string
+		var date string
+		var status string
+		var sender string
+		var input string
+		var pinned string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
+		if err != nil {
+			fmt.Println(err)
+			rows.Close()
+			return []NewMessage{}, err
+		}
+		messages = append(messages, NewMessage{id, origin, date, status, sender, input, pinned})
+	}
+	err = rows.Err()
+	if err != nil {
+		fmt.Println(err)
+		rows.Close()
+		return []NewMessage{}, err
+	}
+	rows.Close()
+	var amount int
+	stmnt = "select coalesce(max(id)+1, 0) from messages;"
+	rows, err = db.Query(stmnt)
+	if err != nil {
+		return []NewMessage{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&amount)
+		if err != nil {
+			return []NewMessage{}, err
+		}
+	}
+	err = rows.Err()
+	if err != nil {
+		return []NewMessage{}, err
+	}
+	c.SetMessageCount(amount - 1)
 	return messages, nil
 }
 

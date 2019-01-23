@@ -57,6 +57,7 @@ func (c *Commander) AddFileToIPFS(filepath string) string {
 	}
 	contentType := bodyWriter.FormDataContentType()
 	bodyWriter.Close()
+	// this operation might be necessary later on
 	// os.Remove(filepath)
 	data, err := RequestPostHTTPS(URLAdd, contentType, bodyBuf)
 	if err != nil {

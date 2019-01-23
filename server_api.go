@@ -36,6 +36,10 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) string {
 		return c.SendMessageWithType(request, "")
 	case "inbox":
 		return c.ProcessInbox(request)
+	case "inboxFull":
+		return c.ProcessFullInbox(request)
+	case "inboxFresh":
+		return c.ProcessFreshInbox(request)
 	case "inboxFired":
 		address := strings.Join(request["address"], "")
 		c.UpdateSentMessages(address)
@@ -81,11 +85,7 @@ func (c *Commander) SendMessageWithType(request map[string][]string, t string) s
 	var id int
 	rec := strings.Join(request["recepient"], "")
 	mid := strings.Join(request["id"], "")
-	cb := c.GetLinkByAddress(rec)
 	link := c.GetHSLink()
-	if cb == "" {
-		return formResponse("", "transaction didn't happen")
-	}
 	if mid == "" {
 		msg = strings.Join(request["msg"], "")
 		a := c.GetSelfAddress()
@@ -96,9 +96,14 @@ func (c *Commander) SendMessageWithType(request map[string][]string, t string) s
 	} else {
 		id, _ = strconv.Atoi(mid)
 		addr := strings.Join(request["address"], "")
+		rec = addr
 		message := c.GetMessageById(addr, id)
 		msg = message.Text
 		t = message.Type
+	}
+	cb := c.GetLinkByAddress(rec)
+	if cb == "" {
+		return formResponse("", "transaction didn't happen")
 	}
 	emsg := c.CipherMessage(rec, msg)
 	tx, err := FormRawTxWithBlockchain(emsg, rec)
@@ -120,6 +125,31 @@ func (c *Commander) SendMessageWithType(request map[string][]string, t string) s
 	return formResponse(tx, "")
 }
 
+func (c *Commander) ProcessFullInbox(request map[string][]string) string {
+	var msgs []NewMessage
+	var response string
+	var out []byte
+	var err error
+	address := strings.Join(request["address"], "")
+	if msgs, err = c.GetFullChatHistory(address); err != nil || len(msgs) == 0 {
+		return `{"res": [], "error": "can't get messages"}`
+	}
+	for i := range msgs {
+		if out, err = json.Marshal(msgs[i]); err != nil {
+			return `{"res": [], "error": "can't parse message"}`
+		}
+		response = fmt.Sprintf("%s%s,", response, string(out))
+	}
+	response = response[:len(response) - 1]
+	go func() {
+		l := c.GetLinkByAddress(address)
+		a := c.GetSelfAddress()
+		uri := fmt.Sprintf("%s/?call=inboxFired&address=%s", l, a)
+		Request(uri)
+	}()
+	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
+}
+
 func (c *Commander) ProcessInbox(request map[string][]string) string {
 	var msgs []NewMessage
 	var response string
@@ -127,6 +157,31 @@ func (c *Commander) ProcessInbox(request map[string][]string) string {
 	var err error
 	address := strings.Join(request["address"], "")
 	if msgs, err = c.GetChatHistory(address); err != nil || len(msgs) == 0 {
+		return `{"res": [], "error": "can't get messages"}`
+	}
+	for i := range msgs {
+		if out, err = json.Marshal(msgs[i]); err != nil {
+			return `{"res": [], "error": "can't parse message"}`
+		}
+		response = fmt.Sprintf("%s%s,", response, string(out))
+	}
+	response = response[:len(response) - 1]
+	go func() {
+		l := c.GetLinkByAddress(address)
+		a := c.GetSelfAddress()
+		uri := fmt.Sprintf("%s/?call=inboxFired&address=%s", l, a)
+		Request(uri)
+	}()
+	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
+}
+
+func (c *Commander) ProcessFreshInbox(request map[string][]string) string {
+	var msgs []NewMessage
+	var response string
+	var out []byte
+	var err error
+	address := strings.Join(request["address"], "")
+	if msgs, err = c.GetLatestMessages(address); err != nil || len(msgs) == 0 {
 		return `{"res": [], "error": "can't get messages"}`
 	}
 	for i := range msgs {
@@ -182,8 +237,7 @@ func (c *Commander) InitiateGreeting(request map[string][]string) string {
 	hexedCipher := Hexify(cipher)
 	link := strings.Split(c.GetHSLink(), ".")[0]
 	selfAddr := c.GetSelfAddress()
-	formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=
-	%s&address=%s&cipher=%s`, cb, link, selfAddr, hexedCipher)
+	formattedUrl := fmt.Sprintf(`%s/?call=greetingOk&callback=%s&address=%s&cipher=%s`, cb, link, selfAddr, hexedCipher)
 	response, err := Request(formattedUrl)
 	if err != nil {
 		return formResponse("", err.Error())
