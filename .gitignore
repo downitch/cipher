@@ -1,6 +1,6 @@
 .DS_Store
-history
-hs
+/history/
+/hs/
 tor
 torrc
 README.md
