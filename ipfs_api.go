@@ -14,8 +14,11 @@ type ipfsResponse struct {
 	Size string `json:"Size"`
 }
 
+const infura = "https://ipfs.infura.io:5001"
+var cat = fmt.Sprintf("%s/api/v0/cat", infura)
+
 func (c *Commander) AddFileToIPFS(filepath string) string {
-	sh := shell.NewShell("https://ipfs.infura.io:5001")
+	sh := shell.NewShell(infura)
 	f, err := os.Open(filepath)
 	buf := bufio.NewReader(f)
 	cid, err := sh.Add(buf)
@@ -26,7 +29,7 @@ func (c *Commander) AddFileToIPFS(filepath string) string {
 }
 
 func (c *Commander) HashFileIPFS(filepath string) string {
-	sh := shell.NewShell("https://ipfs.infura.io:5001")
+	sh := shell.NewShell(infura)
 	opts := shell.OnlyHash(true)
 	f, err := os.Open(filepath)
 	buf := bufio.NewReader(f)
@@ -37,10 +40,8 @@ func (c *Commander) HashFileIPFS(filepath string) string {
 	return cid
 }
 
-const URLCat = "ipfs.infura.io:5001/api/v0/cat"
-
 func (c *Commander) CatFileFromIPFS(hash string) ([]byte, error) {
-	url := fmt.Sprintf("%s?arg=%s", URLCat, hash)
+	url := fmt.Sprintf("%s?arg=%s", cat, hash)
 	data, err := RequestHTTPS(url)
 	if err != nil {
 		return []byte{}, err
