@@ -41,9 +41,9 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) string {
 	case "inboxFresh":
 		return c.ProcessFreshInbox(request)
 	case "inboxFired":
-		address := strings.Join(request["address"], "")
-		c.UpdateSentMessages(address)
-		return formResponse("ok", "")
+		return c.ProcessInboxFired(request)
+	case "updatedMessages":
+		return c.UpdatedMessage(request)
 	case "notify":
 		return c.ProcessNotification(request)
 	case "greeting":
@@ -100,6 +100,7 @@ func (c *Commander) SendMessageWithType(request map[string][]string, t string) s
 		message := c.GetMessageById(addr, id)
 		msg = message.Text
 		t = message.Type
+		c.UpdateUnfailMessage(id, addr)
 	}
 	cb := c.GetLinkByAddress(rec)
 	if cb == "" {
@@ -200,6 +201,12 @@ func (c *Commander) ProcessFreshInbox(request map[string][]string) string {
 	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
 }
 
+func (c *Commander) ProcessInboxFired(request map[string][]string) string {
+	address := strings.Join(request["address"], "")
+	c.UpdateSentMessages(address)
+	return formResponse("ok", "")
+}
+
 func (c *Commander) ProcessNotification(request map[string][]string) string {
 	var t string
 	var address string
@@ -250,6 +257,23 @@ func (c *Commander) InitiateGreeting(request map[string][]string) string {
 		return formResponse("", "can't save user")
 	}
 	return formResponse("ok", "")
+}
+
+func (c *Commander) UpdatedMessage(request map[string][]string) string {
+	var err error
+	var response string
+	var out []byte
+	address := strings.Join(request["address"], "")
+	ids := strings.Join(request["ids"], "")
+	msgs := c.GetMessagesByIds(address, ids)
+	for i := range msgs {
+		if out, err = json.Marshal(msgs[i]); err != nil {
+			return `{"res": [], "error": "can't parse message"}`
+		}
+		response = fmt.Sprintf("%s%s,", response, string(out))
+	}
+	response = response[:len(response) - 1]
+	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
 }
 
 func (c *Commander) ProcessGreeting(request map[string][]string) string {

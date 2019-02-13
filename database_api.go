@@ -609,6 +609,40 @@ func (c *Commander) GetMessageById(addr string, id int) NewMessage {
 	return msg
 }
 
+func (c *Commander) GetMessagesByIds(addr string, ids string) []NewMessage {
+	var msgs []NewMessage
+	db, err := c.openDB(addr)
+	if err != nil {
+		return []NewMessage{}
+	}
+	defer closeDB(db)
+	stmnt := fmt.Sprintf("select id, origin, date, status, sender, input, pinned from messages where id IN (%s);", ids)
+	rows, err := db.Query(stmnt)
+	if err != nil {
+		return []NewMessage{}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var origin string
+		var date string
+		var status string
+		var sender string
+		var input string
+		var pinned string
+		err = rows.Scan(&id, &origin, &date, &status, &sender, &input, &pinned)
+		if err != nil {
+			return []NewMessage{}
+		}
+		msgs = append(msgs, NewMessage{id, origin, date, status, sender, input, pinned})
+	}
+	err = rows.Err()
+	if err != nil {
+		return []NewMessage{}
+	}
+	return msgs
+}
+
 func (c *Commander) UpdateSelfMessages(address string) {
 	db, err := c.openDB(address)
 	if err != nil {
