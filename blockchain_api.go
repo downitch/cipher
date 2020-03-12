@@ -31,10 +31,10 @@ type RandomBlock struct {
 // geth was running locally with light sync
 func runGeth() (ethclient.Client, error) {
 	// dialing to main network of infura.io
-	httpsClient, err := ethclient.Dial("https://mainnet.infura.io")
+	httpsClient, err := ethclient.Dial("https://mainnet.infura.io/v3/5523ae6de6ea4a008cdb7136cab00d49")
 	if err != nil {
 		// returning empty instance and error
-  	return ethclient.Client{}, err
+  		return ethclient.Client{}, err
 	}
 	// returning client instance
 	return *httpsClient, nil
