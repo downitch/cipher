@@ -1,8 +1,8 @@
-package api
+package api // DEPRECATED UNTIL FURTHER INVESIGATION
 
-import(
-	"fmt"
+import (
 	"bufio"
+	"fmt"
 	"os"
 
 	shell "github.com/ipfs/go-ipfs-api"
@@ -15,6 +15,7 @@ type ipfsResponse struct {
 }
 
 const infura = "https://ipfs.infura.io:5001"
+
 var cat = fmt.Sprintf("%s/api/v0/cat", infura)
 
 func (c *Commander) AddFileToIPFS(filepath string) string {

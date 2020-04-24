@@ -1,23 +1,23 @@
-// This package is developed in order to create a 
+// This package is developed in order to create a
 // useful API for Tor communication. It helps ship
 // Tor inside the project and use it inside.
-// It also allows to use Ethereum Blockchain as 
+// It also allows to use Ethereum Blockchain as
 // communication protocol to exchange information
 package api
 
-import(
-	"fmt"
+import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -26,7 +26,7 @@ type RandomBlock struct {
 	number int
 }
 
-// This function returns client instance that allows using infura 
+// This function returns client instance that allows using infura
 // gateway to communicate with the blockchain of Ethereum as if
 // geth was running locally with light sync
 func runGeth() (ethclient.Client, error) {
@@ -34,7 +34,7 @@ func runGeth() (ethclient.Client, error) {
 	httpsClient, err := ethclient.Dial("https://mainnet.infura.io/v3/5523ae6de6ea4a008cdb7136cab00d49")
 	if err != nil {
 		// returning empty instance and error
-  		return ethclient.Client{}, err
+		return ethclient.Client{}, err
 	}
 	// returning client instance
 	return *httpsClient, nil
@@ -65,7 +65,7 @@ func GetLatestBlock() (string, error) {
 	client, _ := runGeth()
 	header, err := client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
-	  return "", errors.New("can't get latest block")
+		return "", errors.New("can't get latest block")
 	}
 	return header.Number.String(), nil
 }
@@ -89,7 +89,7 @@ func GetRandomBlock() (RandomBlock, error) {
 	randomInt := rand.Intn(latestInt)
 	randomInt = randomInt + 1
 	data, _ := GetBlockHash(int64(randomInt))
-	return RandomBlock{ data, randomInt }, nil
+	return RandomBlock{data, randomInt}, nil
 }
 
 // This function writes down 50 random blocks one-by-one
@@ -135,19 +135,19 @@ func FormRawTxWithBlockchain(msg []byte, recepient string) (string, error) {
 	gasPrice := big.NewInt(int64(0))
 	to := common.HexToAddress(recepient)
 	tx := types.NewTransaction(nonce, to, value, gasLimit, gasPrice, msg)
- 	// signing the transaction before sending it
- 	// it is required due to not using MetaMask
- 	CID := big.NewInt(int64(1))
- 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(CID), privateKey)
- 	if err != nil {
- 		return "can't sign transaction", err
- 	}
- 	ts := types.Transactions{signedTx}
- 	rawTxBytes := ts.GetRlp(0)
- 	rawTxHex := Hexify(rawTxBytes)
- 	// raw transaction is return
- 	result := fmt.Sprintf("0x%s", rawTxHex)
- 	return result, nil
+	// signing the transaction before sending it
+	// it is required due to not using MetaMask
+	CID := big.NewInt(int64(1))
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(CID), privateKey)
+	if err != nil {
+		return "can't sign transaction", err
+	}
+	ts := types.Transactions{signedTx}
+	rawTxBytes := ts.GetRlp(0)
+	rawTxHex := Hexify(rawTxBytes)
+	// raw transaction is return
+	result := fmt.Sprintf("0x%s", rawTxHex)
+	return result, nil
 }
 
 func FormRawAccoutBlockchain() ([]byte, error) {

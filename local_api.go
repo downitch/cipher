@@ -1,14 +1,15 @@
 package api
 
-import(
-	"fmt"
+import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"os"
-	"io/ioutil"
-	"strings"
+	"fmt"
 	"image/png"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"github.com/jakobvarmose/go-qidenticon"
 	qrcode "github.com/skip2/go-qrcode"
 )

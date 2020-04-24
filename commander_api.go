@@ -1,6 +1,6 @@
 package api
 
-import(
+import (
 	"database/sql"
 	"net"
 )
@@ -16,12 +16,12 @@ type Commander struct {
 }
 
 func NewCommander(path string) *Commander {
-	var connection   net.Conn
+	var connection net.Conn
 	var dbconnection sql.DB
-	var dbfilename   string
+	var dbfilename string
 	var messagecount int
 	observer := false
-	return &Commander { 
+	return &Commander{
 		ConstantPath:      path,
 		Connection:        connection,
 		DbFilename:        dbfilename,
@@ -41,7 +41,7 @@ func (c *Commander) AcceptConnection(connection net.Conn) {
 }
 
 func (c *Commander) SetDatabaseConnection(name string, conn *sql.DB) {
-	c.DbFilename   = name
+	c.DbFilename = name
 	c.DbConnection = conn
 }
 

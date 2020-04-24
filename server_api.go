@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -57,7 +57,7 @@ var DEFAULT_HANDLER = func(request map[string][]string, c *Commander) string {
 
 func (c *Commander) RunRealServer() {
 	// Here we define our HTTP web-server that will be visible from darkweb
-	server := &http.Server {
+	server := &http.Server{
 		Addr: ":4887",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(DEFAULT_HANDLER(r.URL.Query(), c)))
@@ -76,7 +76,7 @@ func (c *Commander) FormChats() string {
 		out, _ := json.Marshal(chats[i])
 		chatsStr = fmt.Sprintf("%s%s,", chatsStr, string(out))
 	}
-	chatsStr = chatsStr[:len(chatsStr) - 1]
+	chatsStr = chatsStr[:len(chatsStr)-1]
 	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, chatsStr)
 }
 
@@ -141,7 +141,7 @@ func (c *Commander) ProcessFullInbox(request map[string][]string) string {
 		}
 		response = fmt.Sprintf("%s%s,", response, string(out))
 	}
-	response = response[:len(response) - 1]
+	response = response[:len(response)-1]
 	go func() {
 		l := c.GetLinkByAddress(address)
 		a := c.GetSelfAddress()
@@ -166,7 +166,7 @@ func (c *Commander) ProcessInbox(request map[string][]string) string {
 		}
 		response = fmt.Sprintf("%s%s,", response, string(out))
 	}
-	response = response[:len(response) - 1]
+	response = response[:len(response)-1]
 	go func() {
 		l := c.GetLinkByAddress(address)
 		a := c.GetSelfAddress()
@@ -191,7 +191,7 @@ func (c *Commander) ProcessFreshInbox(request map[string][]string) string {
 		}
 		response = fmt.Sprintf("%s%s,", response, string(out))
 	}
-	response = response[:len(response) - 1]
+	response = response[:len(response)-1]
 	go func() {
 		l := c.GetLinkByAddress(address)
 		a := c.GetSelfAddress()
@@ -272,16 +272,16 @@ func (c *Commander) UpdatedMessage(request map[string][]string) string {
 		}
 		response = fmt.Sprintf("%s%s,", response, string(out))
 	}
-	response = response[:len(response) - 1]
+	response = response[:len(response)-1]
 	return fmt.Sprintf(`{"res": [%s], "error": "nil"}`, response)
 }
 
 func (c *Commander) ProcessGreeting(request map[string][]string) string {
-	addr     := strings.Join(request["address"], "")
+	addr := strings.Join(request["address"], "")
 	callback := strings.Join(request["callback"], "")
-	cipher   := strings.Join(request["cipher"], "")
-	cb       := fmt.Sprintf("%s.onion", callback)
-	newUser  := &NewUser{
+	cipher := strings.Join(request["cipher"], "")
+	cb := fmt.Sprintf("%s.onion", callback)
+	newUser := &NewUser{
 		cb,
 		addr,
 		cipher,

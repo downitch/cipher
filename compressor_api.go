@@ -41,7 +41,7 @@ func CompressBigData(ssource string) []byte {
 }
 
 func DecompressBigData(source []byte) string {
-	decompressed := make([]byte, len(source) * 10)
+	decompressed := make([]byte, len(source)*10)
 	_, err := lz4.UncompressBlock(source, decompressed)
 	if err != nil {
 		return string(source)

@@ -27,7 +27,7 @@ func appendByte(slice []byte, data ...byte) []byte {
 	m := len(slice)
 	n := m + len(data)
 	if n > cap(slice) {
-		newSlice := make([]byte, (n + 1) * 2)
+		newSlice := make([]byte, (n+1)*2)
 		copy(newSlice, slice)
 		slice = newSlice
 	}
@@ -67,7 +67,7 @@ func BytifyString(str string) []byte {
 
 func Hexify(source interface{}) string {
 	if str, ok := source.(string); ok {
-    return hex.EncodeToString([]byte(str))
+		return hex.EncodeToString([]byte(str))
 	}
 	b, _ := source.([]byte)
 	return hex.EncodeToString(b)

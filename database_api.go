@@ -1,8 +1,8 @@
 package api
 
-import(
-	"fmt"
+import (
 	"database/sql"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -11,13 +11,13 @@ import(
 )
 
 type NewMessage struct {
-	Id       string `json:"id"`
-	Type     string `json:"type"`
-	Date     string `json:"date"`
-	Status   string `json:"status"`
-	Sender   string `json:"author"`
-	Text     string `json:"text"`
-	Pinned   string `json:"pinned"`
+	Id     string `json:"id"`
+	Type   string `json:"type"`
+	Date   string `json:"date"`
+	Status string `json:"status"`
+	Sender string `json:"author"`
+	Text   string `json:"text"`
+	Pinned string `json:"pinned"`
 }
 
 type NewUser struct {
@@ -27,9 +27,9 @@ type NewUser struct {
 }
 
 type User struct {
-	Username 		  string       `json:"username"`
-	Link 		 		  string       `json:"link"`
-	Addr 		 		  string       `json:"addr"`
+	Username      string       `json:"username"`
+	Link          string       `json:"link"`
+	Addr          string       `json:"addr"`
 	LastMessage   NewMessage   `json:"lastMessage"`
 	NewMessages   string       `json:"newMessages"`
 	Notifications []NewMessage `json:"notifications"`
@@ -178,14 +178,14 @@ func (c *Commander) GetCipherByAddress(address string) string {
 func (c *Commander) CheckExistance(link string) bool {
 	db, err := c.openDB("history")
 	if err != nil {
-		
+
 		return true
 	}
 	defer closeDB(db)
 	stmnt := "select address from knownUsers where link = ?"
 	st, err := db.Prepare(stmnt)
 	if err != nil {
-		
+
 		return true
 	}
 	defer st.Close()
@@ -201,7 +201,7 @@ func (c *Commander) GetChats() []User {
 	var users []User
 	db, err := c.openDB("history")
 	if err != nil {
-		
+
 		return []User{}
 	}
 	defer closeDB(db)
@@ -567,7 +567,7 @@ func (c *Commander) GetNewMessages(addr string) (int, error) {
 	stmnt := `select id from messages where status = ? or status = ?;`
 	rows, err := db.Query(stmnt, "self", "new")
 	if err != nil {
-		
+
 		return 0, err
 	}
 	defer rows.Close()
@@ -709,7 +709,7 @@ func (c *Commander) UpdateUnreadMessage(id int, address string) {
 	return
 }
 
-func(c *Commander) SaveBlock(hash string, number int) error {
+func (c *Commander) SaveBlock(hash string, number int) error {
 	db, err := c.openDB("blocks")
 	if err != nil {
 		return err
@@ -879,7 +879,7 @@ func (c *Commander) PinMessage(addr string, mid int) {
 		stmnt = "update messages set pinned = ? where id = ?"
 		_, err = db.Exec(stmnt, "true", mid)
 		if err != nil {
-			
+
 		}
 		return
 	}

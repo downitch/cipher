@@ -26,17 +26,17 @@ func (c *Commander) ConfigureTorrc() error {
 	settings = fmt.Sprintf("%s\n\nHiddenServiceDir %s", settings, hsPath)
 	settings = fmt.Sprintf("%s\nHiddenServicePort 80 127.0.0.1:4887", settings)
 	// either creating a new file or writing to one that exists
-	err := ioutil.WriteFile(path + "/torrc", []byte(settings), 0644)
+	err := ioutil.WriteFile(path+"/torrc", []byte(settings), 0644)
 	if err != nil {
 		return err
 	}
 	// chmodding directory where application is running
 	correctPermission := int(0700)
 	if _, err := os.Stat(tcpPath); os.IsNotExist(err) {
-   	os.Mkdir(hsPath, os.FileMode(correctPermission))
+		os.Mkdir(hsPath, os.FileMode(correctPermission))
 	}
 	if _, err := os.Stat(hsPath); os.IsNotExist(err) {
-   	os.Mkdir(hsPath, os.FileMode(correctPermission))
+		os.Mkdir(hsPath, os.FileMode(correctPermission))
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func Request(url string) (string, error) {
 	httpClient := &http.Client{Transport: httpTransport}
 	httpTransport.Dial = dialer.Dial
 	// requesting...
-	req, err := http.NewRequest("GET", "http://" + url, nil)
+	req, err := http.NewRequest("GET", "http://"+url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +83,7 @@ func RequestHTTPS(url string) (string, error) {
 	httpClient := &http.Client{Transport: httpTransport}
 	httpTransport.Dial = dialer.Dial
 	// requesting...
-	req, err := http.NewRequest("GET", "https://" + url, nil)
+	req, err := http.NewRequest("GET", "https://"+url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -114,7 +114,7 @@ func RequestPostHTTPS(uri string, contentType string, bodyBuf *bytes.Buffer) (st
 	httpClient := &http.Client{Transport: httpTransport}
 	httpTransport.Dial = dialer.Dial
 	// requesting...
-	req, err := http.NewRequest("POST", "https://" + uri, bodyBuf)
+	req, err := http.NewRequest("POST", "https://"+uri, bodyBuf)
 	req.Header.Set("Content-Type", contentType)
 	if err != nil {
 		return "", err
@@ -149,7 +149,7 @@ func RequestWithTimeout(url string) (string, error) {
 	resp := &http.Response{}
 	go func() {
 		// requesting...
-		req, err := http.NewRequest("GET", "http://" + url, nil)
+		req, err := http.NewRequest("GET", "http://"+url, nil)
 		if err != nil {
 			timeout <- "fail"
 			return
@@ -183,7 +183,7 @@ func RequestWithTimeout(url string) (string, error) {
 
 // This function is highly experimental, because windows is kinda weird
 func (c *Commander) RunTorAndHS() {
-	command := "cd "+c.ConstantPath+" && ./tor --hush -f "+c.ConstantPath+"/torrc"
+	command := "cd " + c.ConstantPath + " && ./tor --hush -f " + c.ConstantPath + "/torrc"
 	out, err := exec.Command("sh", "-c", command).Output()
 	if err != nil {
 		fmt.Printf(err.Error())
