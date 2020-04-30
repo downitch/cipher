@@ -17,12 +17,18 @@ func (c *Commander) PostFile(fpath string) string {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(f)
 	filename := filepath.Base(fpath)
-	return fmt.Sprintf("%s:%s", filename, buf.String())
+	result := fmt.Sprintf("%s:%s", filename, buf.String())
+	return result
 }
 
-func (c *Commander) GetFile(decoded string) (string, []byte) {
+func (c *Commander) GetFile(decoded string) []byte {
+	split := strings.Split(decoded, ":")
+	stringified := split[1]
+	return []byte(stringified)
+}
+
+func (c *Commander) GetFilename(decoded string) string {
 	split := strings.Split(decoded, ":")
 	filename := split[0]
-	stringified := split[1]
-	return filename, []byte(stringified)
+	return filename
 }

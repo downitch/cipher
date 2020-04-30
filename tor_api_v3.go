@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -182,11 +181,11 @@ func RequestWithTimeout(url string) (string, error) {
 }
 
 // This function is highly experimental, because windows is kinda weird
-func (c *Commander) RunTorAndHS() {
-	command := "cd " + c.ConstantPath + " && ./tor --hush -f " + c.ConstantPath + "/torrc"
-	out, err := exec.Command("sh", "-c", command).Output()
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	fmt.Printf("%s\n", out)
-}
+// func (c *Commander) RunTorAndHS() {
+// 	command := "cd " + c.ConstantPath + " && ./tor --hush -f " + c.ConstantPath + "/torrc"
+// 	out, err := exec.Command("sh", "-c", command).Output()
+// 	if err != nil {
+// 		fmt.Printf(err.Error())
+// 	}
+// 	fmt.Printf("%s\n", out)
+// }

@@ -90,6 +90,9 @@ func (c *Commander) SendMessageWithType(request map[string][]string, t string) s
 		msg = strings.Join(request["msg"], "")
 		a := c.GetSelfAddress()
 		id = c.SaveMessage(a, rec, t, msg)
+		fmt.Println(msg)
+		fmt.Println(a)
+		fmt.Println(id)
 		if id == 0 {
 			return formResponse("", "can't save message")
 		}

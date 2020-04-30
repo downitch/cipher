@@ -770,6 +770,7 @@ func (c *Commander) GetRandomBlockFromDB() RandomBlock {
 }
 
 func (c *Commander) AddNewUser(u *NewUser) error {
+	fmt.Println(u.Addr)
 	db, err := c.openDB(u.Addr)
 	if err != nil {
 		return err
@@ -780,8 +781,10 @@ func (c *Commander) AddNewUser(u *NewUser) error {
 	date text,
 	status text,
 	sender text,
-	input text);`
+	input text,
+	pinned boolean);`
 	_, err = db.Exec(stmnt)
+	fmt.Println(err)
 	if err != nil {
 		closeDB(db)
 		return err
@@ -930,7 +933,9 @@ func (c *Commander) SaveMessage(addr string, rec string, mtype string, msg strin
 		'%s',
 		'%s',
 		'false');`, mtype, date, status, addr, msg)
+	fmt.Println(stmnt)
 	_, err = db.Exec(stmnt)
+	fmt.Println(err)
 	if err != nil {
 		return 0
 	}
