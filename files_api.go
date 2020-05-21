@@ -1,24 +1,22 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
 
-func (c *Commander) PostFile(fpath string) string {
-	f, err := os.Open(fpath)
+func (c *Commander) PostFile(fpath string) []byte {
+	content, err := ioutil.ReadFile(fpath)
 	if err != nil {
-		return ""
+		fmt.Println(err)
 	}
-	defer f.Close()
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(f)
-	filename := filepath.Base(fpath)
-	result := fmt.Sprintf("%s:%s", filename, buf.String())
-	return result
+	return content
+}
+
+func (c *Commander) PostFilename(fpath string) string {
+	return filepath.Base(fpath)
 }
 
 func (c *Commander) GetFile(decoded string) []byte {

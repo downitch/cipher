@@ -16,7 +16,7 @@ type ipfsResponse struct {
 
 const infura = "https://ipfs.infura.io:5001"
 
-var cat = fmt.Sprintf("%s/api/v0/cat", infura)
+var cat = fmt.Sprintf("%s/api/v0/cat", infura[8:])
 
 func (c *Commander) AddFileToIPFS(filepath string) string {
 	sh := shell.NewShell(infura)
